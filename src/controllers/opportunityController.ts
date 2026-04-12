@@ -4,7 +4,7 @@ import { OpportunityStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "../db/prisma";
 import { opportunityNoteSchema, opportunityStatusSchema } from "../models/validators";
-import { rescanOpportunity } from "../services/opportunityScanner";
+import { ScanAlreadyRunningError, rescanOpportunity } from "../services/opportunityScanner";
 import { saveOpportunityNotes, updateOpportunityStatus } from "../services/opportunityService";
 import { resolvePagination, buildPaginationMeta } from "../utils/pagination";
 import { redirectWithNotice } from "../utils/redirect";
@@ -129,8 +129,20 @@ export async function changeOpportunityStatus(req: Request, res: Response) {
 
 export async function rescanOpportunityController(req: Request, res: Response) {
   const id = Number(req.params.id);
-  await rescanOpportunity(id);
-  redirectWithNotice(res, `/opportunities/${id}`, { notice: "Opportunity rescanned." });
+
+  try {
+    await rescanOpportunity(id);
+    redirectWithNotice(res, `/opportunities/${id}`, { notice: "Opportunity rescanned." });
+  } catch (error) {
+    if (error instanceof ScanAlreadyRunningError) {
+      redirectWithNotice(res, `/opportunities/${id}`, {
+        error: "This saved search is already scanning in the background."
+      });
+      return;
+    }
+
+    throw error;
+  }
 }
 
 export async function saveOpportunityNotesController(req: Request, res: Response) {

@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 
 import { prisma } from "../db/prisma";
 import { savedSearchSchema } from "../models/validators";
-import { scanSavedSearch } from "../services/opportunityScanner";
+import { ScanAlreadyRunningError, scanSavedSearch } from "../services/opportunityScanner";
 import { parseCheckbox, parseCommaList, parseCurrencyInput, parseIntegerInput, sanitizeText } from "../utils/forms";
 import { redirectWithNotice } from "../utils/redirect";
 
@@ -107,6 +107,16 @@ export async function deleteSavedSearch(req: Request, res: Response) {
 
 export async function runSavedSearchScan(req: Request, res: Response) {
   const id = Number(req.params.id);
-  await scanSavedSearch(id, "manual");
-  redirectWithNotice(res, "/searches", { notice: "Scan completed." });
+
+  try {
+    await scanSavedSearch(id, "manual");
+    redirectWithNotice(res, "/searches", { notice: "Scan completed." });
+  } catch (error) {
+    if (error instanceof ScanAlreadyRunningError) {
+      redirectWithNotice(res, "/searches", { error: "That search is already scanning in the background." });
+      return;
+    }
+
+    throw error;
+  }
 }

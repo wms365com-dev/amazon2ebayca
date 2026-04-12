@@ -12,7 +12,12 @@ async function main() {
     logger.info({ port: env.PORT }, "Server started");
   });
 
-  startScheduledJobs();
+  if (env.internalSchedulerEnabled) {
+    startScheduledJobs();
+    logger.info("In-process scheduler enabled");
+  } else {
+    logger.info("In-process scheduler disabled");
+  }
 }
 
 void main().catch((error) => {

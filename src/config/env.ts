@@ -7,6 +7,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string().default("file:./dev.db"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  INTERNAL_SCHEDULER_ENABLED: z.string().optional(),
+  SCAN_LOCK_TIMEOUT_MINUTES: z.coerce.number().int().min(5).max(240).default(45),
   EBAY_CLIENT_ID: z.string().optional(),
   EBAY_CLIENT_SECRET: z.string().optional(),
   EBAY_ENVIRONMENT: z.enum(["production", "sandbox"]).default("production"),
@@ -37,6 +39,10 @@ function parseBoolean(value?: string): boolean {
 
 export const env = {
   ...parsed.data,
+  internalSchedulerEnabled: parsed.data.INTERNAL_SCHEDULER_ENABLED
+    ? parseBoolean(parsed.data.INTERNAL_SCHEDULER_ENABLED)
+    : true,
+  scanLockTimeoutMinutes: parsed.data.SCAN_LOCK_TIMEOUT_MINUTES,
   demoModeRequested: parseBoolean(parsed.data.DEMO_MODE),
   hasEbayCredentials: Boolean(parsed.data.EBAY_CLIENT_ID && parsed.data.EBAY_CLIENT_SECRET),
   hasAmazonCredentials: Boolean(

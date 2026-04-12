@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 
 import { prisma } from "../db/prisma";
-import { scanSavedSearch } from "../services/opportunityScanner";
+import { ScanAlreadyRunningError, scanSavedSearch } from "../services/opportunityScanner";
 import { resolvePagination, buildPaginationMeta } from "../utils/pagination";
 import { redirectWithNotice } from "../utils/redirect";
 
@@ -43,6 +43,15 @@ export async function retryScanJob(req: Request, res: Response) {
     where: { id }
   });
 
-  await scanSavedSearch(job.savedSearchId, "admin-retry");
-  redirectWithNotice(res, "/admin", { notice: "Retry completed." });
+  try {
+    await scanSavedSearch(job.savedSearchId, "admin-retry");
+    redirectWithNotice(res, "/admin", { notice: "Retry completed." });
+  } catch (error) {
+    if (error instanceof ScanAlreadyRunningError) {
+      redirectWithNotice(res, "/admin", { error: "That saved search is already scanning in the background." });
+      return;
+    }
+
+    throw error;
+  }
 }

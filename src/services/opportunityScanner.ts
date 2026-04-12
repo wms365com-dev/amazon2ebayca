@@ -1,5 +1,8 @@
+import { randomUUID } from "crypto";
+
 import { ApiLogSource, OpportunityStatus, Prisma, ScanJobStatus } from "@prisma/client";
 
+import { env } from "../config/env";
 import { prisma } from "../db/prisma";
 import { EbayService } from "./ebay/ebayService";
 import { AmazonService } from "./amazon/amazonService";
@@ -13,7 +16,18 @@ import { NormalizedEbayListing, ScanSummary } from "../types/domain";
 const ebayService = new EbayService();
 const amazonService = new AmazonService();
 const matchingEngine = new MatchingEngine(amazonService);
-const activeScans = new Set<number>();
+
+interface ScanLease {
+  token: string;
+  expiresAt: Date;
+}
+
+export class ScanAlreadyRunningError extends Error {
+  constructor(savedSearchId: number) {
+    super(`A scan is already running for saved search ${savedSearchId}`);
+    this.name = "ScanAlreadyRunningError";
+  }
+}
 
 function parseStringArray(value: Prisma.JsonValue | null | undefined): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)) : [];
@@ -25,6 +39,87 @@ function buildTaxCost(price: number, shipping: number, applySalesTax: boolean, s
   }
 
   return Number(((price + shipping) * salesTaxRate).toFixed(2));
+}
+
+function getNextLeaseExpiry(from = new Date()) {
+  return new Date(from.getTime() + env.scanLockTimeoutMinutes * 60_000);
+}
+
+async function acquireScanLease(savedSearchId: number): Promise<ScanLease> {
+  const now = new Date();
+  const token = randomUUID();
+  const expiresAt = getNextLeaseExpiry(now);
+  const acquired = await prisma.savedSearch.updateMany({
+    where: {
+      id: savedSearchId,
+      OR: [{ scanLeaseExpiresAt: null }, { scanLeaseExpiresAt: { lte: now } }]
+    },
+    data: {
+      scanLeaseToken: token,
+      scanLeaseExpiresAt: expiresAt
+    }
+  });
+
+  if (acquired.count === 0) {
+    throw new ScanAlreadyRunningError(savedSearchId);
+  }
+
+  await prisma.scanJob.updateMany({
+    where: {
+      savedSearchId,
+      status: ScanJobStatus.RUNNING,
+      finishedAt: null
+    },
+    data: {
+      status: ScanJobStatus.FAILED,
+      finishedAt: now,
+      errorMessage: "Marked failed after scan lease takeover"
+    }
+  });
+
+  return { token, expiresAt };
+}
+
+async function refreshScanLease(savedSearchId: number, lease: ScanLease) {
+  const expiresAt = getNextLeaseExpiry();
+  const refreshed = await prisma.savedSearch.updateMany({
+    where: {
+      id: savedSearchId,
+      scanLeaseToken: lease.token
+    },
+    data: {
+      scanLeaseExpiresAt: expiresAt
+    }
+  });
+
+  if (refreshed.count === 0) {
+    throw new Error(`Scan lease expired for saved search ${savedSearchId}`);
+  }
+
+  lease.expiresAt = expiresAt;
+}
+
+async function releaseScanLease(savedSearchId: number, lease: ScanLease) {
+  await prisma.savedSearch.updateMany({
+    where: {
+      id: savedSearchId,
+      scanLeaseToken: lease.token
+    },
+    data: {
+      scanLeaseToken: null,
+      scanLeaseExpiresAt: null
+    }
+  });
+}
+
+async function withScanLease<T>(savedSearchId: number, callback: (lease: ScanLease) => Promise<T>) {
+  const lease = await acquireScanLease(savedSearchId);
+
+  try {
+    return await callback(lease);
+  } finally {
+    await releaseScanLease(savedSearchId, lease);
+  }
 }
 
 async function upsertEbayListing(listing: NormalizedEbayListing) {
@@ -243,97 +338,99 @@ async function persistOpportunityForListing(
 }
 
 export async function scanSavedSearch(savedSearchId: number, triggeredBy = "manual") {
-  if (activeScans.has(savedSearchId)) {
-    throw new Error("A scan is already running for this saved search");
-  }
+  return withScanLease(savedSearchId, async (lease) => {
+    const savedSearch = await prisma.savedSearch.findUniqueOrThrow({
+      where: { id: savedSearchId }
+    });
 
-  activeScans.add(savedSearchId);
+    let jobId: number | null = null;
 
-  const savedSearch = await prisma.savedSearch.findUniqueOrThrow({
-    where: { id: savedSearchId }
-  });
+    try {
+      const job = await prisma.scanJob.create({
+        data: {
+          savedSearchId,
+          status: ScanJobStatus.RUNNING,
+          triggeredBy
+        }
+      });
+      jobId = job.id;
 
-  const job = await prisma.scanJob.create({
-    data: {
-      savedSearchId,
-      status: ScanJobStatus.RUNNING,
-      triggeredBy
-    }
-  });
+      await refreshScanLease(savedSearchId, lease);
+      const listings = await ebayService.searchListings(
+        {
+          keywords: savedSearch.keywords,
+          categoryId: savedSearch.categoryId,
+          includeBrands: parseStringArray(savedSearch.includeBrands),
+          excludeBrands: parseStringArray(savedSearch.excludeBrands),
+          minPrice: savedSearch.minPrice,
+          maxPrice: savedSearch.maxPrice,
+          conditionFilter: savedSearch.conditionFilter,
+          buyItNowOnly: savedSearch.buyItNowOnly,
+          allowAuctions: savedSearch.allowAuctions,
+          maxShipping: savedSearch.maxShipping
+        },
+        {
+          scanJobId: job.id,
+          savedSearchId
+        }
+      );
 
-  try {
-    const listings = await ebayService.searchListings(
-      {
-        keywords: savedSearch.keywords,
-        categoryId: savedSearch.categoryId,
-        includeBrands: parseStringArray(savedSearch.includeBrands),
-        excludeBrands: parseStringArray(savedSearch.excludeBrands),
-        minPrice: savedSearch.minPrice,
-        maxPrice: savedSearch.maxPrice,
-        conditionFilter: savedSearch.conditionFilter,
-        buyItNowOnly: savedSearch.buyItNowOnly,
-        allowAuctions: savedSearch.allowAuctions,
-        maxShipping: savedSearch.maxShipping
-      },
-      {
-        scanJobId: job.id,
-        savedSearchId
+      const summary: ScanSummary = {
+        listingsFetched: listings.length,
+        listingsProcessed: 0,
+        matchesFound: 0,
+        opportunitiesCreated: 0,
+        warnings: []
+      };
+
+      for (const listing of listings) {
+        await refreshScanLease(savedSearchId, lease);
+
+        try {
+          const outcome = await persistOpportunityForListing(savedSearchId, job.id, listing, savedSearch.minProfit);
+          summary.listingsProcessed += 1;
+          summary.matchesFound += outcome.matched ? 1 : 0;
+          summary.opportunitiesCreated += outcome.isNew ? 1 : 0;
+        } catch (error) {
+          summary.warnings.push(
+            error instanceof Error ? `${listing.ebayItemId}: ${error.message}` : `${listing.ebayItemId}: unknown error`
+          );
+        }
       }
-    );
 
-    const summary: ScanSummary = {
-      listingsFetched: listings.length,
-      listingsProcessed: 0,
-      matchesFound: 0,
-      opportunitiesCreated: 0,
-      warnings: []
-    };
+      const status = summary.warnings.length > 0 ? ScanJobStatus.PARTIAL : ScanJobStatus.SUCCESS;
+      await prisma.scanJob.update({
+        where: { id: job.id },
+        data: {
+          status,
+          itemCount: summary.listingsProcessed,
+          newOpportunityCount: summary.opportunitiesCreated,
+          warningCount: summary.warnings.length,
+          finishedAt: new Date(),
+          summaryJson: summary as unknown as Prisma.InputJsonValue
+        }
+      });
 
-    for (const listing of listings) {
-      try {
-        const outcome = await persistOpportunityForListing(savedSearchId, job.id, listing, savedSearch.minProfit);
-        summary.listingsProcessed += 1;
-        summary.matchesFound += outcome.matched ? 1 : 0;
-        summary.opportunitiesCreated += outcome.isNew ? 1 : 0;
-      } catch (error) {
-        summary.warnings.push(
-          error instanceof Error ? `${listing.ebayItemId}: ${error.message}` : `${listing.ebayItemId}: unknown error`
-        );
-      }
-    }
-
-    const status = summary.warnings.length > 0 ? ScanJobStatus.PARTIAL : ScanJobStatus.SUCCESS;
-    await prisma.scanJob.update({
-      where: { id: job.id },
-      data: {
+      return {
+        jobId: job.id,
         status,
-        itemCount: summary.listingsProcessed,
-        newOpportunityCount: summary.opportunitiesCreated,
-        warningCount: summary.warnings.length,
-        finishedAt: new Date(),
-        summaryJson: summary as unknown as Prisma.InputJsonValue
+        summary
+      };
+    } catch (error) {
+      if (jobId) {
+        await prisma.scanJob.update({
+          where: { id: jobId },
+          data: {
+            status: ScanJobStatus.FAILED,
+            finishedAt: new Date(),
+            errorMessage: error instanceof Error ? error.message : "Unknown scan failure"
+          }
+        });
       }
-    });
 
-    return {
-      jobId: job.id,
-      status,
-      summary
-    };
-  } catch (error) {
-    await prisma.scanJob.update({
-      where: { id: job.id },
-      data: {
-        status: ScanJobStatus.FAILED,
-        finishedAt: new Date(),
-        errorMessage: error instanceof Error ? error.message : "Unknown scan failure"
-      }
-    });
-
-    throw error;
-  } finally {
-    activeScans.delete(savedSearchId);
-  }
+      throw error;
+    }
+  });
 }
 
 export async function rescanOpportunity(opportunityId: number) {
@@ -374,34 +471,37 @@ export async function rescanOpportunity(opportunityId: number) {
     rawJson: opportunity.ebayListing.rawJson
   };
 
-  const job = await prisma.scanJob.create({
-    data: {
-      savedSearchId: opportunity.savedSearchId,
-      status: ScanJobStatus.RUNNING,
-      triggeredBy: "manual-opportunity"
+  await withScanLease(opportunity.savedSearchId, async (lease) => {
+    const job = await prisma.scanJob.create({
+      data: {
+        savedSearchId: opportunity.savedSearchId,
+        status: ScanJobStatus.RUNNING,
+        triggeredBy: "manual-opportunity"
+      }
+    });
+
+    try {
+      await refreshScanLease(opportunity.savedSearchId, lease);
+      await persistOpportunityForListing(opportunity.savedSearchId, job.id, listing, opportunity.savedSearch.minProfit);
+      await prisma.scanJob.update({
+        where: { id: job.id },
+        data: {
+          status: ScanJobStatus.SUCCESS,
+          itemCount: 1,
+          finishedAt: new Date(),
+          summaryJson: { rescannedOpportunityId: opportunityId } as Prisma.InputJsonValue
+        }
+      });
+    } catch (error) {
+      await prisma.scanJob.update({
+        where: { id: job.id },
+        data: {
+          status: ScanJobStatus.FAILED,
+          errorMessage: error instanceof Error ? error.message : "Opportunity rescan failed",
+          finishedAt: new Date()
+        }
+      });
+      throw error;
     }
   });
-
-  try {
-    await persistOpportunityForListing(opportunity.savedSearchId, job.id, listing, opportunity.savedSearch.minProfit);
-    await prisma.scanJob.update({
-      where: { id: job.id },
-      data: {
-        status: ScanJobStatus.SUCCESS,
-        itemCount: 1,
-        finishedAt: new Date(),
-        summaryJson: { rescannedOpportunityId: opportunityId } as Prisma.InputJsonValue
-      }
-    });
-  } catch (error) {
-    await prisma.scanJob.update({
-      where: { id: job.id },
-      data: {
-        status: ScanJobStatus.FAILED,
-        errorMessage: error instanceof Error ? error.message : "Opportunity rescan failed",
-        finishedAt: new Date()
-      }
-    });
-    throw error;
-  }
 }
