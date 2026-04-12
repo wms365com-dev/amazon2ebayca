@@ -1,0 +1,37 @@
+{
+  "B01NAWKYZ0": {
+    "amazonPrice": 94.99,
+    "featuredOfferPrice": 96.49,
+    "rawPricingJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B0BT4G2PDT": {
+    "amazonPrice": 129.99,
+    "featuredOfferPrice": 131.99,
+    "rawPricingJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B00FLYWNYQ": {
+    "amazonPrice": 139.99,
+    "featuredOfferPrice": 144.99,
+    "rawPricingJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B0CJ4JY4F6": {
+    "amazonPrice": 24.99,
+    "featuredOfferPrice": 26.49,
+    "rawPricingJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B00005UP2P": {
+    "amazonPrice": 489.99,
+    "featuredOfferPrice": 509.99,
+    "rawPricingJson": {
+      "source": "demo-fixture"
+    }
+  }
+}

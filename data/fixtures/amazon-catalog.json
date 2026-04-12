@@ -1,0 +1,67 @@
+[
+  {
+    "asin": "B01NAWKYZ0",
+    "title": "Nintendo Switch Pro Controller Black",
+    "brand": "Nintendo",
+    "model": "HACAFSSKA",
+    "packageQuantity": 1,
+    "sizeColorVariant": "Black",
+    "imageUrl": "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=400&q=80",
+    "identifiers": ["0045496594922"],
+    "rawCatalogJson": {
+      "source": "demo-fixture"
+    }
+  },
+  {
+    "asin": "B0BT4G2PDT",
+    "title": "Logitech MX Master 3S Wireless Performance Mouse Black",
+    "brand": "Logitech",
+    "model": "910-006556",
+    "packageQuantity": 1,
+    "sizeColorVariant": "Black",
+    "imageUrl": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=400&q=80",
+    "identifiers": ["0097855176072"],
+    "rawCatalogJson": {
+      "source": "demo-fixture"
+    }
+  },
+  {
+    "asin": "B00FLYWNYQ",
+    "title": "Instant Pot Duo 7-in-1 Electric Pressure Cooker 6 Quart",
+    "brand": "Instant Pot",
+    "model": "Duo60",
+    "packageQuantity": 1,
+    "sizeColorVariant": "6 Quart",
+    "imageUrl": "https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?auto=format&fit=crop&w=400&q=80",
+    "identifiers": ["0853084003556"],
+    "rawCatalogJson": {
+      "source": "demo-fixture"
+    }
+  },
+  {
+    "asin": "B0CJ4JY4F6",
+    "title": "Nerf Elite 2.0 Commander RD-6 Blaster Single Pack",
+    "brand": "Hasbro",
+    "model": "F6369",
+    "packageQuantity": 1,
+    "sizeColorVariant": null,
+    "imageUrl": "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=400&q=80",
+    "identifiers": [],
+    "rawCatalogJson": {
+      "source": "demo-fixture"
+    }
+  },
+  {
+    "asin": "B00005UP2P",
+    "title": "KitchenAid Artisan Series 5 Quart Tilt-Head Stand Mixer Empire Red",
+    "brand": "KitchenAid",
+    "model": "KSM150PSER",
+    "packageQuantity": 1,
+    "sizeColorVariant": "Empire Red",
+    "imageUrl": "https://images.unsplash.com/photo-1570222094114-d054a817e56b?auto=format&fit=crop&w=400&q=80",
+    "identifiers": ["0883049441321"],
+    "rawCatalogJson": {
+      "source": "demo-fixture"
+    }
+  }
+]

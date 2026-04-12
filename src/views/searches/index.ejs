@@ -1,0 +1,67 @@
+<%- include("../partials/head") %>
+<%- include("../partials/header") %>
+<%- include("../partials/flash") %>
+
+<main class="shell page-shell">
+  <section class="page-intro">
+    <div>
+      <h1>Saved Searches</h1>
+      <p>Define sourcing profiles for eBay Canada and re-run them on demand or on a schedule.</p>
+    </div>
+    <div class="intro-actions">
+      <a href="/searches/new" class="button">Create search</a>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Keywords</th>
+            <th>Filters</th>
+            <th>Last scan</th>
+            <th>Opportunities</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (savedSearches.length === 0) { %>
+            <tr><td colspan="6" class="empty">No saved searches yet.</td></tr>
+          <% } %>
+          <% savedSearches.forEach((search) => { %>
+            <tr>
+              <td>
+                <strong><%= search.name %></strong>
+                <div class="muted"><span class="badge <%= search.isActive ? 'active-badge' : 'inactive-badge' %>"><%= search.isActive ? 'Active' : 'Inactive' %></span></div>
+              </td>
+              <td><%= search.keywords %></td>
+              <td>
+                <div class="muted">ROI >= <%= search.minROI ?? '--' %> | Profit >= <%= formatCurrency(search.minProfit) %></div>
+                <div class="muted">Every <%= search.scanFrequencyMinutes %> min</div>
+              </td>
+              <td><%= search.scanJobs[0] ? formatDateTime(search.scanJobs[0].startedAt) : 'Never' %></td>
+              <td><%= search._count.opportunities %></td>
+              <td>
+                <div class="action-row">
+                  <form method="post" action="/searches/<%= search.id %>/scan">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                    <button type="submit" class="button small">Scan now</button>
+                  </form>
+                  <a href="/searches/<%= search.id %>/edit" class="button secondary small">Edit</a>
+                  <form method="post" action="/searches/<%= search.id %>/delete" data-confirm="Delete this saved search?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                    <button type="submit" class="button ghost small">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

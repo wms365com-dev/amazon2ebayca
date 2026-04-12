@@ -1,0 +1,132 @@
+<%- include("../partials/head") %>
+<%- include("../partials/header") %>
+<%- include("../partials/flash") %>
+
+<main class="shell page-shell">
+  <section class="page-intro">
+    <div>
+      <h1>Dashboard</h1>
+      <p>Track saved searches, scan history, throttling, and the most promising Amazon.ca FBA opportunities.</p>
+    </div>
+    <div class="intro-actions">
+      <a href="/searches/new" class="button">New search</a>
+      <a href="/opportunities?profitableOnly=true" class="button secondary">Profitable only</a>
+    </div>
+  </section>
+
+  <section class="metric-grid">
+    <article class="metric-card">
+      <span class="metric-label">Active searches</span>
+      <strong><%= metrics.totalActiveSearches %></strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Total opportunities</span>
+      <strong><%= metrics.totalOpportunities %></strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Profitable</span>
+      <strong><%= metrics.profitableOpportunities %></strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Watched items</span>
+      <strong><%= metrics.watchedItems %></strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Buy candidates</span>
+      <strong><%= metrics.buyCandidates %></strong>
+    </article>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Latest scans</h2>
+        <a href="/searches" class="text-link">Manage searches</a>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Search</th>
+              <th>Status</th>
+              <th>Items</th>
+              <th>Started</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (latestScans.length === 0) { %>
+              <tr><td colspan="4" class="empty">No scans yet.</td></tr>
+            <% } %>
+            <% latestScans.forEach((job) => { %>
+              <tr>
+                <td><%= job.savedSearch.name %></td>
+                <td><span class="badge status-<%= job.status.toLowerCase() %>"><%= job.status %></span></td>
+                <td><%= job.itemCount %></td>
+                <td><%= formatDateTime(job.startedAt) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Top opportunities</h2>
+        <a href="/opportunities" class="text-link">View all</a>
+      </div>
+      <div class="stack-list">
+        <% if (topOpportunities.length === 0) { %>
+          <p class="empty">Run a scan to populate opportunities.</p>
+        <% } %>
+        <% topOpportunities.forEach((item) => { %>
+          <a href="/opportunities/<%= item.id %>" class="opportunity-card">
+            <div>
+              <strong><%= item.ebayListing.title %></strong>
+              <div class="muted"><%= item.savedSearch.name %></div>
+            </div>
+            <div class="opportunity-meta">
+              <span class="profit <%= item.netProfit >= 0 ? 'positive' : 'negative' %>"><%= formatCurrency(item.netProfit) %></span>
+              <span class="badge"><%= item.roiPercent.toFixed(1) %>% ROI</span>
+              <span class="badge risk risk-<%= item.riskScore >= 70 ? 'high' : item.riskScore >= 40 ? 'medium' : 'low' %>">Risk <%= item.riskScore %></span>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Recent errors and throttling</h2>
+      <a href="/admin" class="text-link">Open logs</a>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Operation</th>
+            <th>Message</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (recentErrors.length === 0) { %>
+            <tr><td colspan="4" class="empty">No recent errors or throttling warnings.</td></tr>
+          <% } %>
+          <% recentErrors.forEach((log) => { %>
+            <tr>
+              <td><span class="badge"><%= log.source %></span></td>
+              <td><%= log.operation %></td>
+              <td><%= log.message || 'No message provided' %></td>
+              <td><%= formatDateTime(log.createdAt) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

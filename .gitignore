@@ -1,0 +1,14 @@
+node_modules
+dist
+.npm-cache
+.env
+.DS_Store
+*.log
+dev.db
+dev.db-journal
+prisma/dev.db
+prisma/dev.db-journal
+coverage
+.railway
+data/cache/*
+!data/cache/.gitkeep

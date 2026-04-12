@@ -1,0 +1,153 @@
+<%- include("../partials/head") %>
+<%- include("../partials/header") %>
+<%- include("../partials/flash") %>
+
+<main class="shell page-shell">
+  <section class="page-intro">
+    <div>
+      <h1>Opportunities</h1>
+      <p>Filter for profitable, higher-confidence matches and move promising items into Buy, Watch, Reject, or Review.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <form method="get" action="/opportunities" class="filter-grid">
+      <label class="toggle">
+        <input type="checkbox" name="profitableOnly" value="true" <%= filters.profitableOnly === 'true' ? 'checked' : '' %> />
+        <span>Profitable only</span>
+      </label>
+      <label>
+        <span>Min ROI</span>
+        <input type="number" step="0.1" name="minROI" value="<%= filters.minROI ?? '' %>" />
+      </label>
+      <label>
+        <span>Min net profit</span>
+        <input type="number" step="0.1" name="minProfit" value="<%= filters.minProfit ?? '' %>" />
+      </label>
+      <label>
+        <span>Min confidence</span>
+        <input type="number" min="0" max="100" name="minConfidence" value="<%= filters.minConfidence ?? '' %>" />
+      </label>
+      <label>
+        <span>Max risk</span>
+        <input type="number" min="0" max="100" name="maxRisk" value="<%= filters.maxRisk ?? '' %>" />
+      </label>
+      <label>
+        <span>Source search</span>
+        <select name="sourceSearchId">
+          <option value="">All</option>
+          <% savedSearches.forEach((search) => { %>
+            <option value="<%= search.id %>" <%= String(filters.sourceSearchId ?? '') === String(search.id) ? 'selected' : '' %>><%= search.name %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>
+        <span>Status</span>
+        <select name="status">
+          <option value="">All</option>
+          <% ['NEW','WATCH','BUY','REJECT','REVIEW'].forEach((status) => { %>
+            <option value="<%= status %>" <%= String(filters.status ?? '') === status ? 'selected' : '' %>><%= status %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>
+        <span>Sort by</span>
+        <select name="sortBy">
+          <option value="roi" <%= String(filters.sortBy ?? 'roi') === 'roi' ? 'selected' : '' %>>ROI</option>
+          <option value="profit" <%= String(filters.sortBy ?? '') === 'profit' ? 'selected' : '' %>>Net profit</option>
+          <option value="confidence" <%= String(filters.sortBy ?? '') === 'confidence' ? 'selected' : '' %>>Confidence</option>
+          <option value="recent" <%= String(filters.sortBy ?? '') === 'recent' ? 'selected' : '' %>>Recent</option>
+        </select>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="button">Apply filters</button>
+        <a href="/opportunities" class="button secondary">Reset</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>eBay title</th>
+            <th>eBay price</th>
+            <th>Shipping</th>
+            <th>Landed</th>
+            <th>ASIN</th>
+            <th>Amazon title</th>
+            <th>Amazon price</th>
+            <th>Fees</th>
+            <th>Inbound / prep</th>
+            <th>Net profit</th>
+            <th>ROI</th>
+            <th>Confidence</th>
+            <th>Risk</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (opportunities.length === 0) { %>
+            <tr><td colspan="16" class="empty">No opportunities matched your current filters.</td></tr>
+          <% } %>
+          <% opportunities.forEach((item) => { %>
+            <tr>
+              <td>
+                <% if (item.ebayListing.imageUrl) { %>
+                  <img src="<%= item.ebayListing.imageUrl %>" alt="eBay item" class="thumb" />
+                <% } else { %>
+                  <div class="thumb placeholder"></div>
+                <% } %>
+              </td>
+              <td>
+                <a href="/opportunities/<%= item.id %>"><strong><%= item.ebayListing.title %></strong></a>
+                <div class="muted"><%= item.savedSearch.name %></div>
+              </td>
+              <td><%= formatCurrency(item.ebayItemCost) %></td>
+              <td><%= formatCurrency(item.ebayShippingCost) %></td>
+              <td><%= formatCurrency(item.totalLandedCost) %></td>
+              <td><%= item.amazonMatch?.asin ?? '--' %></td>
+              <td><%= item.amazonMatch?.amazonTitle ?? 'No confident match yet' %></td>
+              <td><%= formatCurrency(item.amazonSellPrice) %></td>
+              <td><%= formatCurrency(item.amazonFeeEstimate) %></td>
+              <td><%= formatCurrency(item.inboundCostEstimate + item.prepCostEstimate + item.labelCostEstimate) %></td>
+              <td><span class="profit <%= item.netProfit >= 0 ? 'positive' : 'negative' %>"><%= formatCurrency(item.netProfit) %></span></td>
+              <td><span class="badge"><%= item.roiPercent.toFixed(1) %>%</span></td>
+              <td><span class="badge confidence"><%= item.amazonMatch?.matchConfidence ?? 0 %></span></td>
+              <td><span class="badge risk risk-<%= item.riskScore >= 70 ? 'high' : item.riskScore >= 40 ? 'medium' : 'low' %>"><%= item.riskScore %></span></td>
+              <td><span class="badge status-<%= item.status.toLowerCase() %>"><%= item.status %></span></td>
+              <td>
+                <div class="action-stack">
+                  <a href="<%= item.ebayListing.itemWebUrl %>" class="text-link" target="_blank" rel="noreferrer">eBay</a>
+                  <% if (item.amazonMatch?.asin) { %>
+                    <a href="https://www.amazon.ca/dp/<%= item.amazonMatch.asin %>" class="text-link" target="_blank" rel="noreferrer">Amazon</a>
+                  <% } %>
+                  <form method="post" action="/opportunities/<%= item.id %>/rescan">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                    <button type="submit" class="button ghost small">Rescan</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination-bar">
+      <span>Page <%= pagination.page %> of <%= pagination.totalPages %></span>
+      <div class="action-row">
+        <% if (pagination.hasPrevious) { %>
+          <a href="/opportunities?page=<%= pagination.page - 1 %>" class="button secondary small">Previous</a>
+        <% } %>
+        <% if (pagination.hasNext) { %>
+          <a href="/opportunities?page=<%= pagination.page + 1 %>" class="button secondary small">Next</a>
+        <% } %>
+      </div>
+    </div>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

@@ -1,0 +1,112 @@
+<%- include("../partials/head") %>
+<%- include("../partials/header") %>
+<%- include("../partials/flash") %>
+
+<main class="shell page-shell">
+  <section class="page-intro">
+    <div>
+      <h1>Admin / Logs</h1>
+      <p>Inspect API calls, throttling events, failed matches, and recent job runs.</p>
+    </div>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Job runs</h2>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Search</th>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Warnings</th>
+              <th>Retry</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% jobs.forEach((job) => { %>
+              <tr>
+                <td><%= job.savedSearch.name %></td>
+                <td><span class="badge status-<%= job.status.toLowerCase() %>"><%= job.status %></span></td>
+                <td><%= formatDateTime(job.startedAt) %></td>
+                <td><%= job.warningCount %></td>
+                <td>
+                  <form method="post" action="/admin/jobs/<%= job.id %>/retry">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                    <button type="submit" class="button ghost small">Retry</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Failed matches</h2>
+      </div>
+      <div class="stack-list">
+        <% if (failedMatches.length === 0) { %>
+          <p class="empty">No failed matches currently logged.</p>
+        <% } %>
+        <% failedMatches.forEach((item) => { %>
+          <a href="/opportunities/<%= item.id %>" class="opportunity-card">
+            <div>
+              <strong><%= item.ebayListing.title %></strong>
+              <div class="muted"><%= item.savedSearch.name %></div>
+            </div>
+            <span class="badge status-review">Needs review</span>
+          </a>
+        <% }) %>
+      </div>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>API call logs</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Operation</th>
+            <th>Status</th>
+            <th>Message</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% logs.forEach((log) => { %>
+            <tr>
+              <td><span class="badge"><%= log.source %></span></td>
+              <td><%= log.operation %></td>
+              <td><%= log.statusCode ?? (log.isSuccess ? 'OK' : 'ERR') %></td>
+              <td><%= log.message ?? 'No message' %></td>
+              <td><%= formatDateTime(log.createdAt) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination-bar">
+      <span>Page <%= pagination.page %> of <%= pagination.totalPages %></span>
+      <div class="action-row">
+        <% if (pagination.hasPrevious) { %>
+          <a href="/admin?page=<%= pagination.page - 1 %>" class="button secondary small">Previous</a>
+        <% } %>
+        <% if (pagination.hasNext) { %>
+          <a href="/admin?page=<%= pagination.page + 1 %>" class="button secondary small">Next</a>
+        <% } %>
+      </div>
+    </div>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

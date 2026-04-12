@@ -1,0 +1,42 @@
+{
+  "B01NAWKYZ0": {
+    "feeEstimate": 23.15,
+    "fulfillmentFee": 9.75,
+    "referralFee": 13.4,
+    "rawFeesJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B0BT4G2PDT": {
+    "feeEstimate": 27.7,
+    "fulfillmentFee": 10.5,
+    "referralFee": 17.2,
+    "rawFeesJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B00FLYWNYQ": {
+    "feeEstimate": 31.2,
+    "fulfillmentFee": 12.1,
+    "referralFee": 19.1,
+    "rawFeesJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B0CJ4JY4F6": {
+    "feeEstimate": 9.65,
+    "fulfillmentFee": 4.25,
+    "referralFee": 5.4,
+    "rawFeesJson": {
+      "source": "demo-fixture"
+    }
+  },
+  "B00005UP2P": {
+    "feeEstimate": 78.45,
+    "fulfillmentFee": 28.25,
+    "referralFee": 50.2,
+    "rawFeesJson": {
+      "source": "demo-fixture"
+    }
+  }
+}

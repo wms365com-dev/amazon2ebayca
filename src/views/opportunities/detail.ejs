@@ -1,0 +1,167 @@
+<%- include("../partials/head") %>
+<%- include("../partials/header") %>
+<%- include("../partials/flash") %>
+
+<main class="shell page-shell">
+  <section class="page-intro">
+    <div>
+      <h1>Opportunity Detail</h1>
+      <p>Review the listing, Amazon match, assumptions, risk flags, and status history before making a sourcing decision.</p>
+    </div>
+    <div class="intro-actions">
+      <a href="/opportunities" class="button secondary">Back to list</a>
+    </div>
+  </section>
+
+  <section class="detail-grid">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>eBay listing summary</h2>
+        <a href="<%= opportunity.ebayListing.itemWebUrl %>" target="_blank" rel="noreferrer" class="text-link">Open eBay listing</a>
+      </div>
+      <div class="detail-card">
+        <% if (opportunity.ebayListing.imageUrl) { %>
+          <img src="<%= opportunity.ebayListing.imageUrl %>" alt="eBay item image" class="detail-image" />
+        <% } %>
+        <div class="detail-copy">
+          <strong><%= opportunity.ebayListing.title %></strong>
+          <p class="muted">Condition: <%= opportunity.ebayListing.condition ?? 'Unknown' %></p>
+          <p class="muted">Brand: <%= opportunity.ebayListing.brand ?? 'Unknown' %> | UPC: <%= opportunity.ebayListing.upc ?? opportunity.ebayListing.gtin ?? '--' %></p>
+          <p class="muted">Seller: <%= opportunity.ebayListing.sellerUsername ?? 'Unknown' %> | Feedback: <%= opportunity.ebayListing.sellerFeedbackPercentage ?? '--' %>%</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Amazon match</h2>
+        <% if (opportunity.amazonMatch?.asin) { %>
+          <a href="https://www.amazon.ca/dp/<%= opportunity.amazonMatch.asin %>" target="_blank" rel="noreferrer" class="text-link">Open Amazon ASIN</a>
+        <% } %>
+      </div>
+      <% if (opportunity.amazonMatch) { %>
+        <div class="detail-card">
+          <% if (opportunity.amazonMatch.imageUrl) { %>
+            <img src="<%= opportunity.amazonMatch.imageUrl %>" alt="Amazon item image" class="detail-image" />
+          <% } %>
+          <div class="detail-copy">
+            <strong><%= opportunity.amazonMatch.amazonTitle %></strong>
+            <p class="muted">ASIN: <%= opportunity.amazonMatch.asin %></p>
+            <p class="muted">Confidence: <span class="badge confidence"><%= opportunity.amazonMatch.matchConfidence %></span></p>
+            <p class="muted">Method: <%= opportunity.amazonMatch.matchMethod %></p>
+          </div>
+        </div>
+        <div class="tag-list">
+          <% (Array.isArray(opportunity.amazonMatch.matchReasons) ? opportunity.amazonMatch.matchReasons : []).forEach((reason) => { %>
+            <span class="tag success"><%= reason %></span>
+          <% }) %>
+          <% (Array.isArray(opportunity.amazonMatch.matchWarnings) ? opportunity.amazonMatch.matchWarnings : []).forEach((warning) => { %>
+            <span class="tag warning"><%= warning %></span>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="empty">No confident Amazon.ca match was stored yet.</p>
+      <% } %>
+    </article>
+  </section>
+
+  <section class="detail-grid">
+    <article class="panel">
+      <h2>Pricing breakdown</h2>
+      <dl class="stats-list">
+        <div><dt>eBay item cost</dt><dd><%= formatCurrency(opportunity.ebayItemCost) %></dd></div>
+        <div><dt>eBay shipping</dt><dd><%= formatCurrency(opportunity.ebayShippingCost) %></dd></div>
+        <div><dt>Inbound cost</dt><dd><%= formatCurrency(opportunity.inboundCostEstimate) %></dd></div>
+        <div><dt>Prep cost</dt><dd><%= formatCurrency(opportunity.prepCostEstimate) %></dd></div>
+        <div><dt>Label cost</dt><dd><%= formatCurrency(opportunity.labelCostEstimate) %></dd></div>
+        <div><dt>Other costs</dt><dd><%= formatCurrency(opportunity.otherCostEstimate) %></dd></div>
+        <div><dt>Total landed cost</dt><dd><%= formatCurrency(opportunity.totalLandedCost) %></dd></div>
+        <div><dt>Amazon sell price</dt><dd><%= formatCurrency(opportunity.amazonSellPrice) %></dd></div>
+        <div><dt>Amazon fees</dt><dd><%= formatCurrency(opportunity.amazonFeeEstimate) %></dd></div>
+        <div><dt>Net profit</dt><dd class="<%= opportunity.netProfit >= 0 ? 'positive' : 'negative' %>"><%= formatCurrency(opportunity.netProfit) %></dd></div>
+        <div><dt>ROI</dt><dd><%= opportunity.roiPercent.toFixed(1) %>%</dd></div>
+        <div><dt>Margin</dt><dd><%= opportunity.marginPercent.toFixed(1) %>%</dd></div>
+        <div><dt>Break-even</dt><dd><%= formatCurrency(opportunity.breakEvenSellPrice) %></dd></div>
+      </dl>
+    </article>
+
+    <article class="panel">
+      <h2>Assumptions and risk</h2>
+      <p class="muted">Marketplace ID: <%= settings.amazonMarketplaceId %></p>
+      <p class="muted">Sales tax assumption: <%= settings.applySalesTax ? `On (${(settings.salesTaxRate * 100).toFixed(0)}%)` : 'Off' %></p>
+      <p class="muted">Current status: <span class="badge status-<%= opportunity.status.toLowerCase() %>"><%= opportunity.status %></span></p>
+      <p class="muted">Risk score: <span class="badge risk risk-<%= opportunity.riskScore >= 70 ? 'high' : opportunity.riskScore >= 40 ? 'medium' : 'low' %>"><%= opportunity.riskScore %></span></p>
+      <div class="tag-list">
+        <% (Array.isArray(opportunity.riskFlags) ? opportunity.riskFlags : []).forEach((flag) => { %>
+          <span class="tag danger"><%= flag.code %> - <%= flag.message %></span>
+        <% }) %>
+      </div>
+      <% if ((Array.isArray(opportunity.riskFlags) ? opportunity.riskFlags : []).length === 0) { %>
+        <p class="empty">No risk flags were triggered for this opportunity.</p>
+      <% } %>
+    </article>
+  </section>
+
+  <section class="detail-grid">
+    <article class="panel">
+      <h2>Workflow</h2>
+      <form method="post" action="/opportunities/<%= opportunity.id %>/status" class="inline-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+        <label>
+          <span>Status</span>
+          <select name="status">
+            <% statuses.forEach((status) => { %>
+              <option value="<%= status %>" <%= opportunity.status === status ? 'selected' : '' %>><%= status %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="grow">
+          <span>History note</span>
+          <input type="text" name="note" placeholder="Optional note" />
+        </label>
+        <button type="submit" class="button">Update status</button>
+      </form>
+
+      <form method="post" action="/opportunities/<%= opportunity.id %>/rescan" class="inline-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+        <button type="submit" class="button secondary">Rescan now</button>
+      </form>
+
+      <h3>Notes</h3>
+      <form method="post" action="/opportunities/<%= opportunity.id %>/notes" class="stack-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+        <textarea name="notes" rows="6" placeholder="Add sourcing notes, review follow-ups, or restriction checks."><%= opportunity.notes ?? '' %></textarea>
+        <button type="submit" class="button">Save notes</button>
+      </form>
+    </article>
+
+    <article class="panel">
+      <h2>Status history</h2>
+      <div class="timeline">
+        <% if (opportunity.statusHistory.length === 0) { %>
+          <p class="empty">No history yet.</p>
+        <% } %>
+        <% opportunity.statusHistory.forEach((entry) => { %>
+          <div class="timeline-item">
+            <strong><%= entry.fromStatus ?? 'Created' %> → <%= entry.toStatus %></strong>
+            <div class="muted"><%= formatDateTime(entry.createdAt) %></div>
+            <% if (entry.note) { %><div><%= entry.note %></div><% } %>
+          </div>
+        <% }) %>
+      </div>
+
+      <h3>Recent rescans</h3>
+      <div class="timeline">
+        <% rescans.forEach((job) => { %>
+          <div class="timeline-item">
+            <strong><%= job.status %></strong>
+            <div class="muted"><%= formatDateTime(job.startedAt) %></div>
+            <% if (job.errorMessage) { %><div><%= job.errorMessage %></div><% } %>
+          </div>
+        <% }) %>
+      </div>
+    </article>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum MatchMethod {
+  UPC
+  GTIN
+  BRAND_MODEL
+  TITLE_SIMILARITY
+  MANUAL
+}
+
+enum OpportunityStatus {
+  NEW
+  WATCH
+  BUY
+  REJECT
+  REVIEW
+}
+
+enum ScanJobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum ApiLogSource {
+  EBAY
+  AMAZON
+  SCHEDULER
+  APP
+}
+
+model User {
+  id            Int           @id @default(autoincrement())
+  email         String?       @unique
+  name          String
+  savedSearches SavedSearch[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model SavedSearch {
+  id                   Int           @id @default(autoincrement())
+  userId               Int?
+  name                 String
+  keywords             String
+  categoryId           String?
+  includeBrands        Json?
+  excludeBrands        Json?
+  minPrice             Float?
+  maxPrice             Float?
+  conditionFilter      String?
+  buyItNowOnly         Boolean       @default(true)
+  allowAuctions        Boolean       @default(false)
+  maxShipping          Float?
+  minROI               Float?
+  minProfit            Float?
+  scanFrequencyMinutes Int           @default(60)
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  user                 User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  opportunities        Opportunity[]
+  scanJobs             ScanJob[]
+  apiLogs              ApiLog[]
+
+  @@index([isActive])
+}
+
+model EbayListing {
+  id                        Int           @id @default(autoincrement())
+  ebayItemId                String        @unique
+  title                     String
+  subtitle                  String?
+  condition                 String?
+  buyingOptions             Json?
+  currentPrice              Float
+  shippingCost              Float?
+  itemWebUrl                String
+  imageUrl                  String?
+  sellerUsername            String?
+  sellerFeedbackPercentage  Float?
+  sellerFeedbackScore       Int?
+  gtin                      String?
+  brand                     String?
+  mpn                       String?
+  upc                       String?
+  categoryPath              String?
+  locationCountry           String?
+  listingEndAt              DateTime?
+  rawJson                   Json
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+  amazonMatch               AmazonMatch?
+  opportunities             Opportunity[]
+}
+
+model AmazonMatch {
+  id                 Int           @id @default(autoincrement())
+  ebayListingId      Int           @unique
+  asin               String?
+  amazonTitle        String?
+  brand              String?
+  model              String?
+  packageQuantity    Int?
+  sizeColorVariant   String?
+  imageUrl           String?
+  amazonPrice        Float?
+  featuredOfferPrice Float?
+  feeEstimate        Float?
+  fulfillmentFee     Float?
+  referralFee        Float?
+  matchConfidence    Int
+  matchMethod        MatchMethod
+  matchReasons       Json?
+  matchWarnings      Json?
+  rawCatalogJson     Json?
+  rawPricingJson     Json?
+  rawFeesJson        Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  ebayListing        EbayListing   @relation(fields: [ebayListingId], references: [id], onDelete: Cascade)
+  opportunities      Opportunity[]
+}
+
+model Opportunity {
+  id                  Int                        @id @default(autoincrement())
+  savedSearchId       Int
+  ebayListingId       Int
+  amazonMatchId       Int?
+  ebayItemCost        Float
+  ebayShippingCost    Float
+  inboundCostEstimate Float
+  prepCostEstimate    Float
+  labelCostEstimate   Float
+  otherCostEstimate   Float
+  totalLandedCost     Float
+  amazonSellPrice     Float
+  amazonFeeEstimate   Float
+  netProfit           Float
+  roiPercent          Float
+  marginPercent       Float
+  breakEvenSellPrice  Float
+  riskScore           Int
+  riskFlags           Json?
+  status              OpportunityStatus         @default(NEW)
+  notes               String?
+  lastScannedAt       DateTime
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  savedSearch         SavedSearch               @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+  ebayListing         EbayListing               @relation(fields: [ebayListingId], references: [id], onDelete: Cascade)
+  amazonMatch         AmazonMatch?              @relation(fields: [amazonMatchId], references: [id], onDelete: SetNull)
+  statusHistory       OpportunityStatusHistory[]
+
+  @@unique([savedSearchId, ebayListingId])
+  @@index([status])
+  @@index([roiPercent])
+  @@index([netProfit])
+}
+
+model OpportunityStatusHistory {
+  id            Int               @id @default(autoincrement())
+  opportunityId Int
+  fromStatus    OpportunityStatus?
+  toStatus      OpportunityStatus
+  note          String?
+  createdAt     DateTime          @default(now())
+  opportunity   Opportunity       @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId, createdAt])
+}
+
+model ScanJob {
+  id                   Int           @id @default(autoincrement())
+  savedSearchId        Int
+  status               ScanJobStatus @default(QUEUED)
+  triggeredBy          String?
+  startedAt            DateTime      @default(now())
+  finishedAt           DateTime?
+  itemCount            Int           @default(0)
+  newOpportunityCount  Int           @default(0)
+  warningCount         Int           @default(0)
+  errorMessage         String?
+  summaryJson          Json?
+  savedSearch          SavedSearch   @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+  apiLogs              ApiLog[]
+
+  @@index([savedSearchId, startedAt])
+}
+
+model AppSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ApiLog {
+  id           Int          @id @default(autoincrement())
+  source       ApiLogSource
+  operation    String
+  requestKey   String?
+  statusCode   Int?
+  isSuccess    Boolean      @default(true)
+  isThrottled  Boolean      @default(false)
+  cacheHit     Boolean      @default(false)
+  message      String?
+  detail       Json?
+  scanJobId    Int?
+  savedSearchId Int?
+  createdAt    DateTime     @default(now())
+  scanJob      ScanJob?     @relation(fields: [scanJobId], references: [id], onDelete: SetNull)
+  savedSearch  SavedSearch? @relation(fields: [savedSearchId], references: [id], onDelete: SetNull)
+
+  @@index([source, createdAt])
+  @@index([isThrottled])
+}
