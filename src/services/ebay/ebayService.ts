@@ -186,7 +186,11 @@ export class EbayService {
       requestKey: params.keywords,
       statusCode: response.status,
       message: context.bypassCache ? "eBay search completed with fresh fetch" : "eBay search completed",
-      detail: { count: filtered.length, bypassCache: context.bypassCache ?? false },
+      detail: {
+        rawCount: listings.length,
+        filteredCount: filtered.length,
+        bypassCache: context.bypassCache ?? false
+      },
       scanJobId: context.scanJobId,
       savedSearchId: context.savedSearchId
     });
@@ -207,15 +211,17 @@ export class EbayService {
       const title = listing.title.toLowerCase();
       const brand = String(listing.brand ?? "").toLowerCase();
       const shipping = listing.shippingCost ?? 0;
-      const keywordTokens = params.keywords.toLowerCase().split(/\s+/).filter(Boolean);
+      const titleHasIncludedBrand =
+        includeBrands.size > 0 && [...includeBrands].some((includeBrand) => title.includes(includeBrand));
+      const titleHasExcludedBrand =
+        excludeBrands.size > 0 && [...excludeBrands].some((excludeBrand) => title.includes(excludeBrand));
 
-      if (keywordTokens.length > 0 && !keywordTokens.every((token) => title.includes(token))) {
+      // eBay Browse already handles keyword relevance. Local filtering should stay permissive so
+      // fresh listings are not dropped just because titles use slightly different wording.
+      if (includeBrands.size > 0 && !(includeBrands.has(brand) || (!brand && titleHasIncludedBrand))) {
         return false;
       }
-      if (includeBrands.size > 0 && !includeBrands.has(brand)) {
-        return false;
-      }
-      if (excludeBrands.has(brand)) {
+      if (excludeBrands.has(brand) || titleHasExcludedBrand) {
         return false;
       }
       if (params.minPrice !== null && params.minPrice !== undefined && listing.currentPrice < params.minPrice) {
