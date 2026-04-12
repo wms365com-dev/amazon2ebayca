@@ -371,7 +371,8 @@ export async function scanSavedSearch(savedSearchId: number, triggeredBy = "manu
         },
         {
           scanJobId: job.id,
-          savedSearchId
+          savedSearchId,
+          bypassCache: true
         }
       );
 

@@ -30,6 +30,7 @@ interface SearchListingsParams {
 interface SearchContext {
   scanJobId?: number;
   savedSearchId?: number;
+  bypassCache?: boolean;
 }
 
 export class EbayService {
@@ -94,20 +95,22 @@ export class EbayService {
     }
 
     const cacheKey = `ebay:${JSON.stringify(params)}`;
-    const cached = await readCache<NormalizedEbayListing[]>(cacheKey, 15 * 60_000);
-    if (cached) {
-      await createApiLog({
-        source: ApiLogSource.EBAY,
-        operation: "searchListings",
-        requestKey: params.keywords,
-        cacheHit: true,
-        message: "Served from file cache",
-        detail: { count: cached.length },
-        scanJobId: context.scanJobId,
-        savedSearchId: context.savedSearchId
-      });
+    if (!context.bypassCache) {
+      const cached = await readCache<NormalizedEbayListing[]>(cacheKey, 15 * 60_000);
+      if (cached) {
+        await createApiLog({
+          source: ApiLogSource.EBAY,
+          operation: "searchListings",
+          requestKey: params.keywords,
+          cacheHit: true,
+          message: "Served from file cache",
+          detail: { count: cached.length },
+          scanJobId: context.scanJobId,
+          savedSearchId: context.savedSearchId
+        });
 
-      return cached;
+        return cached;
+      }
     }
 
     const accessToken = await this.getAccessToken();
@@ -174,14 +177,16 @@ export class EbayService {
     const listings = (response.data.itemSummaries ?? []).map((item) => this.normalizeListing(item));
     const filtered = this.filterListings(listings, params);
 
-    await writeCache(cacheKey, filtered);
+    if (!context.bypassCache) {
+      await writeCache(cacheKey, filtered);
+    }
     await createApiLog({
       source: ApiLogSource.EBAY,
       operation: "searchListings",
       requestKey: params.keywords,
       statusCode: response.status,
-      message: "eBay search completed",
-      detail: { count: filtered.length },
+      message: context.bypassCache ? "eBay search completed with fresh fetch" : "eBay search completed",
+      detail: { count: filtered.length, bypassCache: context.bypassCache ?? false },
       scanJobId: context.scanJobId,
       savedSearchId: context.savedSearchId
     });
