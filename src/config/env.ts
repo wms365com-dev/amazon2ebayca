@@ -10,6 +10,7 @@ const envSchema = z.object({
   EBAY_CLIENT_ID: z.string().optional(),
   EBAY_CLIENT_SECRET: z.string().optional(),
   EBAY_ENVIRONMENT: z.enum(["production", "sandbox"]).default("production"),
+  EBAY_NOTIFICATION_VERIFICATION_TOKEN: z.string().optional(),
   AMAZON_SPAPI_CLIENT_ID: z.string().optional(),
   AMAZON_SPAPI_CLIENT_SECRET: z.string().optional(),
   AMAZON_SPAPI_REFRESH_TOKEN: z.string().optional(),

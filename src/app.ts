@@ -3,6 +3,7 @@ import express from "express";
 import path from "path";
 
 import router from "./routes";
+import webhookRouter from "./routes/webhooks";
 import { httpLogger } from "./config/logger";
 import { getAppSettings } from "./services/settingsService";
 import { isDemoModeActive } from "./services/demo/demoMode";
@@ -20,6 +21,7 @@ export function createApp() {
   app.use(express.json());
   app.use(cookieParser());
   app.use(express.static(path.join(process.cwd(), "src", "public")));
+  app.use("/webhooks", webhookRouter);
   app.use(csrfTokenMiddleware);
   app.use(verifyCsrfMiddleware);
 

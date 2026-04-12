@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import { NextFunction, Request, Response } from "express";
 
+function isCsrfExemptPath(path: string) {
+  return path.startsWith("/webhooks/");
+}
+
 function ensureToken(req: Request, res: Response) {
   const existing = req.cookies?.csrfToken as string | undefined;
   const token = existing || crypto.randomBytes(24).toString("hex");
@@ -17,11 +21,21 @@ function ensureToken(req: Request, res: Response) {
 }
 
 export function csrfTokenMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (isCsrfExemptPath(req.path)) {
+    next();
+    return;
+  }
+
   ensureToken(req, res);
   next();
 }
 
 export function verifyCsrfMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (isCsrfExemptPath(req.path)) {
+    next();
+    return;
+  }
+
   const token = ensureToken(req, res);
 
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
