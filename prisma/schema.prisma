@@ -38,6 +38,11 @@ enum ApiLogSource {
   APP
 }
 
+enum Marketplace {
+  EBAY_CA
+  AMAZON_CA
+}
+
 model User {
   id            Int           @id @default(autoincrement())
   email         String?       @unique
@@ -51,6 +56,8 @@ model SavedSearch {
   id                   Int           @id @default(autoincrement())
   userId               Int?
   name                 String
+  sourceMarketplace    Marketplace   @default(EBAY_CA)
+  destinationMarketplace Marketplace @default(AMAZON_CA)
   keywords             String
   categoryId           String?
   includeBrands        Json?
@@ -71,11 +78,165 @@ model SavedSearch {
   updatedAt            DateTime      @updatedAt
   user                 User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   opportunities        Opportunity[]
+  arbitrageOpportunities ArbitrageOpportunity[]
   scanJobs             ScanJob[]
   apiLogs              ApiLog[]
 
   @@index([isActive])
   @@index([scanLeaseExpiresAt])
+  @@index([sourceMarketplace, destinationMarketplace])
+}
+
+model MarketplaceListing {
+  id                        Int                    @id @default(autoincrement())
+  marketplace               Marketplace
+  externalListingId         String
+  listingKind               String                 @default("OFFER")
+  title                     String
+  subtitle                  String?
+  condition                 String?
+  buyingOptions             Json?
+  currentPrice              Float
+  shippingCost              Float?
+  listingUrl                String
+  imageUrl                  String?
+  sellerName                String?
+  sellerFeedbackPercentage  Float?
+  sellerFeedbackScore       Int?
+  gtin                      String?
+  brand                     String?
+  mpn                       String?
+  upc                       String?
+  categoryPath              String?
+  locationCountry           String?
+  quantityAvailable         Int?
+  packageQuantity           Int?
+  variant                   String?
+  listingEndAt              DateTime?
+  rawJson                   Json
+  firstSeenAt               DateTime               @default(now())
+  lastSeenAt                DateTime               @default(now())
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  snapshots                 ListingSnapshot[]
+  sourceMatches             ListingMatch[]         @relation("SourceListingMatches")
+  destinationMatches        ListingMatch[]         @relation("DestinationListingMatches")
+  sourceOpportunities       ArbitrageOpportunity[] @relation("OpportunitySourceListing")
+  destinationOpportunities  ArbitrageOpportunity[] @relation("OpportunityDestinationListing")
+
+  @@unique([marketplace, externalListingId])
+  @@index([marketplace, brand, currentPrice])
+}
+
+model ListingSnapshot {
+  id                  Int               @id @default(autoincrement())
+  marketplaceListingId Int
+  observedAt          DateTime          @default(now())
+  price               Float
+  shippingCost        Float?
+  quantityAvailable   Int?
+  rawJson             Json?
+  marketplaceListing  MarketplaceListing @relation(fields: [marketplaceListingId], references: [id], onDelete: Cascade)
+
+  @@index([marketplaceListingId, observedAt])
+}
+
+model ListingMatch {
+  id                   Int                    @id @default(autoincrement())
+  sourceListingId      Int
+  destinationListingId Int
+  confidence           Int
+  matchMethod          MatchMethod
+  reasons              Json?
+  warnings             Json?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  sourceListing        MarketplaceListing     @relation("SourceListingMatches", fields: [sourceListingId], references: [id], onDelete: Cascade)
+  destinationListing   MarketplaceListing     @relation("DestinationListingMatches", fields: [destinationListingId], references: [id], onDelete: Cascade)
+  opportunities        ArbitrageOpportunity[]
+
+  @@unique([sourceListingId, destinationListingId])
+  @@index([confidence])
+}
+
+model ArbitrageOpportunity {
+  id                        Int                                @id @default(autoincrement())
+  opportunityKey            String                             @unique
+  savedSearchId             Int
+  sourceListingId           Int
+  destinationListingId      Int?
+  listingMatchId            Int?
+  sourceItemCost            Float
+  sourceShippingCost        Float
+  sourceFeeEstimate         Float
+  destinationSellPrice      Float
+  destinationShippingCredit Float
+  destinationFeeEstimate    Float
+  fulfillmentCostEstimate   Float
+  prepCostEstimate          Float
+  labelCostEstimate         Float
+  otherCostEstimate         Float
+  totalCost                 Float
+  netProfit                 Float
+  roiPercent                Float
+  marginPercent             Float
+  breakEvenSellPrice        Float
+  confidenceScore           Int
+  riskScore                 Int
+  riskFlags                 Json?
+  status                    OpportunityStatus                  @default(NEW)
+  notes                     String?
+  lastScannedAt             DateTime
+  createdAt                 DateTime                           @default(now())
+  updatedAt                 DateTime                           @updatedAt
+  savedSearch               SavedSearch                         @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+  sourceListing             MarketplaceListing                  @relation("OpportunitySourceListing", fields: [sourceListingId], references: [id], onDelete: Cascade)
+  destinationListing        MarketplaceListing?                 @relation("OpportunityDestinationListing", fields: [destinationListingId], references: [id], onDelete: SetNull)
+  listingMatch              ListingMatch?                       @relation(fields: [listingMatchId], references: [id], onDelete: SetNull)
+  statusHistory             ArbitrageOpportunityStatusHistory[]
+  snapshots                 ArbitrageOpportunitySnapshot[]
+
+  @@index([savedSearchId, status])
+  @@index([roiPercent])
+  @@index([netProfit])
+  @@index([confidenceScore])
+}
+
+model ArbitrageOpportunityStatusHistory {
+  id             Int               @id @default(autoincrement())
+  opportunityId  Int
+  fromStatus     OpportunityStatus?
+  toStatus       OpportunityStatus
+  note           String?
+  createdAt      DateTime          @default(now())
+  opportunity    ArbitrageOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId, createdAt])
+}
+
+model ArbitrageOpportunitySnapshot {
+  id                     Int                 @id @default(autoincrement())
+  opportunityId          Int
+  observedAt             DateTime            @default(now())
+  sourceItemCost         Float
+  destinationSellPrice   Float
+  destinationFeeEstimate Float
+  netProfit              Float
+  roiPercent             Float
+  marginPercent          Float
+  riskScore              Int
+  calculationJson        Json?
+  opportunity            ArbitrageOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId, observedAt])
+}
+
+model ApiCacheEntry {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  payload   Json
+  cachedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model EbayListing {

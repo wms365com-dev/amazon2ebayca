@@ -5,11 +5,11 @@
 <main class="shell page-shell">
   <section class="page-intro">
     <div>
-      <h1>Saved Searches</h1>
-      <p>Define sourcing profiles for eBay Canada and re-run them on demand or on a schedule.</p>
+      <h1>Scan Profiles</h1>
+      <p>Define source and destination marketplaces, keep every observation in the database, and rescan them on demand or on schedule.</p>
     </div>
     <div class="intro-actions">
-      <a href="/searches/new" class="button">Create search</a>
+      <a href="/searches/new" class="button">Create profile</a>
     </div>
   </section>
 
@@ -19,6 +19,7 @@
         <thead>
           <tr>
             <th>Name</th>
+            <th>Direction</th>
             <th>Keywords</th>
             <th>Filters</th>
             <th>Last scan</th>
@@ -28,7 +29,7 @@
         </thead>
         <tbody>
           <% if (savedSearches.length === 0) { %>
-            <tr><td colspan="6" class="empty">No saved searches yet.</td></tr>
+            <tr><td colspan="7" class="empty">No scan profiles yet.</td></tr>
           <% } %>
           <% savedSearches.forEach((search) => { %>
             <tr>
@@ -36,13 +37,14 @@
                 <strong><%= search.name %></strong>
                 <div class="muted"><span class="badge <%= search.isActive ? 'active-badge' : 'inactive-badge' %>"><%= search.isActive ? 'Active' : 'Inactive' %></span></div>
               </td>
+              <td><span class="badge"><%= search.sourceMarketplace %> -> <%= search.destinationMarketplace %></span></td>
               <td><%= search.keywords %></td>
               <td>
                 <div class="muted">ROI >= <%= search.minROI ?? '--' %> | Profit >= <%= formatCurrency(search.minProfit) %></div>
                 <div class="muted">Every <%= search.scanFrequencyMinutes %> min</div>
               </td>
               <td><%= search.scanJobs[0] ? formatDateTime(search.scanJobs[0].startedAt) : 'Never' %></td>
-              <td><%= search._count.opportunities %></td>
+              <td><%= search._count.arbitrageOpportunities %></td>
               <td>
                 <div class="action-row">
                   <form method="post" action="/searches/<%= search.id %>/scan">
@@ -50,7 +52,7 @@
                     <button type="submit" class="button small">Scan now</button>
                   </form>
                   <a href="/searches/<%= search.id %>/edit" class="button secondary small">Edit</a>
-                  <form method="post" action="/searches/<%= search.id %>/delete" data-confirm="Delete this saved search?">
+                  <form method="post" action="/searches/<%= search.id %>/delete" data-confirm="Delete this scan profile?">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
                     <button type="submit" class="button ghost small">Delete</button>
                   </form>

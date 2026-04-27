@@ -1,10 +1,29 @@
-import { AmazonCatalogCandidate, NormalizedEbayListing, RiskAssessment, RiskFlag } from "../../types/domain";
+import { Marketplace } from "@prisma/client";
 
-interface RiskInput {
+import {
+  AmazonCatalogCandidate,
+  NormalizedEbayListing,
+  NormalizedMarketplaceListing,
+  RiskAssessment,
+  RiskFlag
+} from "../../types/domain";
+
+interface LegacyRiskInput {
   listing: NormalizedEbayListing;
   matchConfidence: number;
   matchWarnings: string[];
   candidate: AmazonCatalogCandidate | null;
+  netProfit: number;
+  marginPercent: number;
+  minProfitThreshold?: number | null;
+}
+
+interface ArbitrageRiskInput {
+  sourceListing: NormalizedMarketplaceListing;
+  destinationListing: NormalizedMarketplaceListing | null;
+  destinationMarketplace: Marketplace;
+  matchConfidence: number;
+  matchWarnings: string[];
   netProfit: number;
   marginPercent: number;
   minProfitThreshold?: number | null;
@@ -16,28 +35,31 @@ function pushFlag(flags: RiskFlag[], code: RiskFlag["code"], severity: RiskFlag[
   flags.push({ code, severity, message });
 }
 
-export function assessRisk(input: RiskInput): RiskAssessment {
+export function assessArbitrageRisk(input: ArbitrageRiskInput): RiskAssessment {
   const flags: RiskFlag[] = [];
   let score = 5;
-  const condition = String(input.listing.condition ?? "").toLowerCase();
-  const brand = String(input.listing.brand ?? input.candidate?.brand ?? "").toLowerCase();
+  const condition = String(input.sourceListing.condition ?? "").toLowerCase();
+  const brand = String(input.sourceListing.brand ?? input.destinationListing?.brand ?? "").toLowerCase();
 
-  if (!input.listing.upc && !input.listing.gtin) {
+  if (!input.sourceListing.upc && !input.sourceListing.gtin) {
     pushFlag(flags, "NO_BARCODE", "medium", "Listing has no UPC or GTIN for deterministic matching.");
     score += 12;
   }
 
   if (condition.includes("used") || condition.includes("open")) {
-    pushFlag(flags, "USED_CONDITION", "high", "Used or open-box inventory is riskier for Amazon FBA resale.");
+    pushFlag(flags, "USED_CONDITION", "high", "Used or open-box inventory increases fulfillment and return risk.");
     score += 18;
   }
 
-  if ((input.listing.sellerFeedbackPercentage ?? 100) < 96) {
+  if (
+    input.sourceListing.marketplace === Marketplace.EBAY_CA &&
+    (input.sourceListing.sellerFeedbackPercentage ?? 100) < 96
+  ) {
     pushFlag(flags, "LOW_SELLER_FEEDBACK", "medium", "Seller feedback percentage is below the safer threshold.");
     score += 10;
   }
 
-  if ((input.listing.sellerFeedbackScore ?? 0) < 100) {
+  if (input.sourceListing.marketplace === Marketplace.EBAY_CA && (input.sourceListing.sellerFeedbackScore ?? 0) < 100) {
     pushFlag(flags, "LOW_SELLER_VOLUME", "medium", "Seller has limited historical feedback volume.");
     score += 8;
   }
@@ -48,22 +70,22 @@ export function assessRisk(input: RiskInput): RiskAssessment {
   }
 
   if (input.matchWarnings.some((warning) => warning.toLowerCase().includes("low title overlap"))) {
-    pushFlag(flags, "TITLE_MISMATCH", "high", "Title mismatch suggests the Amazon item may be different.");
+    pushFlag(flags, "TITLE_MISMATCH", "high", "Title mismatch suggests the destination listing may be different.");
     score += 14;
   }
 
   if (input.matchWarnings.some((warning) => warning.toLowerCase().includes("variant terms differ"))) {
-    pushFlag(flags, "VARIANT_MISMATCH", "high", "Variant terms differ between eBay and Amazon.");
+    pushFlag(flags, "VARIANT_MISMATCH", "high", "Variant terms differ between source and destination.");
     score += 16;
   }
 
   if (input.matchConfidence < 55) {
-    pushFlag(flags, "BRAND_MISMATCH", "medium", "Match confidence is low for a reliable sourcing decision.");
+    pushFlag(flags, "BRAND_MISMATCH", "medium", "Match confidence is low for a reliable arbitrage decision.");
     score += 10;
   }
 
   if (input.marginPercent < 12) {
-    pushFlag(flags, "LOW_MARGIN", "medium", "Margin is thin and could disappear with price movement.");
+    pushFlag(flags, "LOW_MARGIN", "medium", "Margin is thin and could disappear with fees or price movement.");
     score += 10;
   }
 
@@ -72,30 +94,30 @@ export function assessRisk(input: RiskInput): RiskAssessment {
     input.minProfitThreshold !== null &&
     input.netProfit < input.minProfitThreshold
   ) {
-    pushFlag(flags, "LOW_PROFIT", "medium", "Net profit is below the saved search threshold.");
+    pushFlag(flags, "LOW_PROFIT", "medium", "Net profit is below the scan profile threshold.");
     score += 9;
   }
 
-  if (input.candidate?.amazonPrice && input.candidate.featuredOfferPrice) {
-    const spread = Math.abs(input.candidate.amazonPrice - input.candidate.featuredOfferPrice);
-    if (spread / Math.max(input.candidate.amazonPrice, 1) > 0.18) {
-      pushFlag(flags, "VOLATILE_PRICING", "medium", "Amazon pricing spread looks volatile.");
-      score += 8;
-    }
+  if (input.destinationMarketplace === Marketplace.EBAY_CA) {
+    pushFlag(flags, "ACTIVE_COMPS_ONLY", "medium", "eBay sell-side estimate is based on active listing comps, not sold comps.");
+    score += 8;
   }
 
-  if (restrictedBrands.has(brand)) {
+  if (restrictedBrands.has(brand) && input.destinationMarketplace === Marketplace.AMAZON_CA) {
     pushFlag(flags, "POSSIBLE_RESTRICTION", "medium", "Brand may require ungating or extra compliance checks.");
     score += 8;
   }
 
-  if (!input.listing.imageUrl || !input.candidate?.imageUrl) {
-    pushFlag(flags, "IMAGE_UNVERIFIED", "low", "Image similarity has not been verified in MVP mode.");
+  if (!input.sourceListing.imageUrl || !input.destinationListing?.imageUrl) {
+    pushFlag(flags, "IMAGE_UNVERIFIED", "low", "Image similarity has not been verified automatically.");
     score += 5;
   }
 
-  if (input.candidate?.featuredOfferPrice && input.listing.currentPrice < input.candidate.featuredOfferPrice * 0.4) {
-    pushFlag(flags, "SUSPICIOUS_PRICE", "medium", "eBay price is unusually low relative to Amazon and needs review.");
+  if (
+    input.destinationListing?.currentPrice &&
+    input.sourceListing.currentPrice < input.destinationListing.currentPrice * 0.4
+  ) {
+    pushFlag(flags, "SUSPICIOUS_PRICE", "medium", "Source price is unusually low relative to destination pricing and needs review.");
     score += 8;
   }
 
@@ -112,4 +134,73 @@ export function assessRisk(input: RiskInput): RiskAssessment {
     flags,
     summary
   };
+}
+
+export function assessRisk(input: LegacyRiskInput): RiskAssessment {
+  const destinationListing: NormalizedMarketplaceListing | null = input.candidate
+    ? {
+        marketplace: Marketplace.AMAZON_CA,
+        externalListingId: input.candidate.asin,
+        listingKind: "CATALOG",
+        title: input.candidate.title,
+        subtitle: null,
+        condition: "NEW",
+        buyingOptions: ["CATALOG"],
+        currentPrice: input.candidate.featuredOfferPrice ?? input.candidate.amazonPrice ?? 0,
+        shippingCost: 0,
+        listingUrl: `https://www.amazon.ca/dp/${input.candidate.asin}`,
+        imageUrl: input.candidate.imageUrl ?? null,
+        sellerName: null,
+        sellerFeedbackPercentage: null,
+        sellerFeedbackScore: null,
+        gtin: input.candidate.identifiers?.[0] ?? null,
+        brand: input.candidate.brand ?? null,
+        mpn: input.candidate.model ?? null,
+        upc: input.candidate.identifiers?.[0] ?? null,
+        categoryPath: null,
+        locationCountry: "CA",
+        quantityAvailable: null,
+        packageQuantity: input.candidate.packageQuantity ?? null,
+        variant: input.candidate.sizeColorVariant ?? null,
+        listingEndAt: null,
+        rawJson: input.candidate.rawCatalogJson ?? {}
+      }
+    : null;
+
+  return assessArbitrageRisk({
+    sourceListing: {
+      marketplace: Marketplace.EBAY_CA,
+      externalListingId: input.listing.ebayItemId,
+      listingKind: "OFFER",
+      title: input.listing.title,
+      subtitle: input.listing.subtitle ?? null,
+      condition: input.listing.condition ?? null,
+      buyingOptions: input.listing.buyingOptions,
+      currentPrice: input.listing.currentPrice,
+      shippingCost: input.listing.shippingCost ?? 0,
+      listingUrl: input.listing.itemWebUrl,
+      imageUrl: input.listing.imageUrl ?? null,
+      sellerName: input.listing.sellerUsername ?? null,
+      sellerFeedbackPercentage: input.listing.sellerFeedbackPercentage ?? null,
+      sellerFeedbackScore: input.listing.sellerFeedbackScore ?? null,
+      gtin: input.listing.gtin ?? null,
+      brand: input.listing.brand ?? null,
+      mpn: input.listing.mpn ?? null,
+      upc: input.listing.upc ?? null,
+      categoryPath: input.listing.categoryPath ?? null,
+      locationCountry: input.listing.locationCountry ?? null,
+      quantityAvailable: null,
+      packageQuantity: null,
+      variant: null,
+      listingEndAt: input.listing.listingEndAt ?? null,
+      rawJson: input.listing.rawJson
+    },
+    destinationListing,
+    destinationMarketplace: Marketplace.AMAZON_CA,
+    matchConfidence: input.matchConfidence,
+    matchWarnings: input.matchWarnings,
+    netProfit: input.netProfit,
+    marginPercent: input.marginPercent,
+    minProfitThreshold: input.minProfitThreshold
+  });
 }

@@ -103,7 +103,7 @@ export async function runDueSearchScans(triggeredBy = "scheduler"): Promise<DueS
     source: ApiLogSource.SCHEDULER,
     operation: "dueScanSweep",
     requestKey: triggeredBy,
-    message: "Completed due saved search sweep",
+    message: "Completed due scan profile sweep",
     detail: summary
   });
 

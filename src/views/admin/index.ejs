@@ -6,7 +6,7 @@
   <section class="page-intro">
     <div>
       <h1>Admin / Logs</h1>
-      <p>Inspect API calls, throttling events, failed matches, and recent job runs.</p>
+      <p>Inspect API calls, throttling events, failed destination matches, and recent scan jobs.</p>
     </div>
   </section>
 
@@ -19,7 +19,7 @@
         <table>
           <thead>
             <tr>
-              <th>Search</th>
+              <th>Profile</th>
               <th>Status</th>
               <th>Started</th>
               <th>Warnings</th>
@@ -48,16 +48,16 @@
 
     <article class="panel">
       <div class="panel-head">
-        <h2>Failed matches</h2>
+        <h2>Needs destination match</h2>
       </div>
       <div class="stack-list">
         <% if (failedMatches.length === 0) { %>
-          <p class="empty">No failed matches currently logged.</p>
+          <p class="empty">No unmatched opportunities currently logged.</p>
         <% } %>
         <% failedMatches.forEach((item) => { %>
           <a href="/opportunities/<%= item.id %>" class="opportunity-card">
             <div>
-              <strong><%= item.ebayListing.title %></strong>
+              <strong><%= item.sourceListing.title %></strong>
               <div class="muted"><%= item.savedSearch.name %></div>
             </div>
             <span class="badge status-review">Needs review</span>

@@ -1,4 +1,4 @@
-import { MatchMethod, OpportunityStatus } from "@prisma/client";
+import { Marketplace, MatchMethod, OpportunityStatus } from "@prisma/client";
 
 export interface NormalizedEbayListing {
   ebayItemId: string;
@@ -42,6 +42,46 @@ export interface AmazonCatalogCandidate {
   rawFeesJson?: unknown;
 }
 
+export interface NormalizedMarketplaceListing {
+  marketplace: Marketplace;
+  externalListingId: string;
+  listingKind: "OFFER" | "CATALOG";
+  title: string;
+  subtitle?: string | null;
+  condition?: string | null;
+  buyingOptions: string[];
+  currentPrice: number;
+  shippingCost?: number | null;
+  listingUrl: string;
+  imageUrl?: string | null;
+  sellerName?: string | null;
+  sellerFeedbackPercentage?: number | null;
+  sellerFeedbackScore?: number | null;
+  gtin?: string | null;
+  brand?: string | null;
+  mpn?: string | null;
+  upc?: string | null;
+  categoryPath?: string | null;
+  locationCountry?: string | null;
+  quantityAvailable?: number | null;
+  packageQuantity?: number | null;
+  variant?: string | null;
+  listingEndAt?: string | null;
+  rawJson: unknown;
+}
+
+export interface ListingMatchEvidence {
+  destination: NormalizedMarketplaceListing | null;
+  confidence: number;
+  method: MatchMethod;
+  reasons: string[];
+  warnings: string[];
+  destinationPrice: number;
+  destinationFeeEstimate: number;
+  destinationShippingCredit: number;
+  fulfillmentCostEstimate: number;
+}
+
 export interface MatchingEvidence {
   bestCandidate: AmazonCatalogCandidate | null;
   confidence: number;
@@ -59,6 +99,18 @@ export interface ProfitCalculationInput {
   otherCost: number;
   amazonSellPrice: number;
   amazonFeeEstimate: number;
+}
+
+export interface ArbitrageCalculationInput {
+  sourcePrice: number;
+  sourceShippingCost: number;
+  sourceFeeEstimate: number;
+  destinationSellPrice: number;
+  destinationFeeEstimate: number;
+  fulfillmentCostEstimate: number;
+  prepCostEstimate: number;
+  labelCostEstimate: number;
+  otherCostEstimate: number;
 }
 
 export interface ProfitCalculationResult {
@@ -84,7 +136,8 @@ export interface RiskFlag {
     | "POSSIBLE_RESTRICTION"
     | "VOLATILE_PRICING"
     | "IMAGE_UNVERIFIED"
-    | "SUSPICIOUS_PRICE";
+    | "SUSPICIOUS_PRICE"
+    | "ACTIVE_COMPS_ONLY";
   severity: "low" | "medium" | "high";
   message: string;
 }
@@ -120,6 +173,9 @@ export interface AppSettings {
   defaultPrepCost: number;
   defaultLabelCost: number;
   defaultOtherCost: number;
+  defaultOutboundShippingCost: number;
+  defaultEbayFinalValueFeePercent: number;
+  defaultEbayFixedFee: number;
   applySalesTax: boolean;
   salesTaxRate: number;
   schedulerEnabled: boolean;

@@ -1,10 +1,10 @@
 import crypto from "crypto";
 
-import { ApiLogSource } from "@prisma/client";
+import { ApiLogSource, Marketplace } from "@prisma/client";
 
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
-import { AmazonCatalogCandidate } from "../../types/domain";
+import { AmazonCatalogCandidate, NormalizedMarketplaceListing } from "../../types/domain";
 import { readCache, writeCache } from "../../utils/cache";
 import { requestWithRetry } from "../../utils/http";
 import { createApiLog } from "../apiLogService";
@@ -36,6 +36,58 @@ export class AmazonService {
   private readonly baseUrl = "https://sellingpartnerapi-na.amazon.com";
   private readonly serviceName = "execute-api";
 
+  async searchSourceListings(
+    keywords: string,
+    marketplaceId: string,
+    limit = 10,
+    context: RequestContext = {}
+  ): Promise<NormalizedMarketplaceListing[]> {
+    const catalog = await this.searchCatalogByKeywords(keywords, marketplaceId, context);
+    const limited = catalog.slice(0, limit);
+    const listings: NormalizedMarketplaceListing[] = [];
+
+    for (const candidate of limited) {
+      const pricing = await this.getPricingForAsin(candidate.asin, marketplaceId, context);
+      const sellPrice = pricing.featuredOfferPrice ?? pricing.amazonPrice ?? candidate.featuredOfferPrice ?? candidate.amazonPrice;
+      if (!sellPrice) {
+        continue;
+      }
+
+      listings.push({
+        marketplace: Marketplace.AMAZON_CA,
+        externalListingId: candidate.asin,
+        listingKind: "CATALOG",
+        title: candidate.title,
+        subtitle: null,
+        condition: "NEW",
+        buyingOptions: ["CATALOG"],
+        currentPrice: sellPrice,
+        shippingCost: 0,
+        listingUrl: `https://www.amazon.ca/dp/${candidate.asin}`,
+        imageUrl: candidate.imageUrl ?? null,
+        sellerName: null,
+        sellerFeedbackPercentage: null,
+        sellerFeedbackScore: null,
+        gtin: candidate.identifiers?.[0] ?? null,
+        brand: candidate.brand ?? null,
+        mpn: candidate.model ?? null,
+        upc: candidate.identifiers?.[0] ?? null,
+        categoryPath: null,
+        locationCountry: "CA",
+        quantityAvailable: null,
+        packageQuantity: candidate.packageQuantity ?? null,
+        variant: candidate.sizeColorVariant ?? null,
+        listingEndAt: null,
+        rawJson: {
+          catalog: candidate.rawCatalogJson,
+          pricing: pricing.rawPricingJson
+        }
+      });
+    }
+
+    return listings;
+  }
+
   async searchCatalogByIdentifier(
     identifier: string,
     identifierType: IdentifierType,
@@ -43,9 +95,11 @@ export class AmazonService {
     context: RequestContext = {}
   ): Promise<AmazonCatalogCandidate[]> {
     const settings = await getAppSettings();
-    if (!env.hasAmazonCredentials || settings.demoModeOverride || env.demoModeRequested) {
+    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
+    if (explicitDemoMode) {
       return this.searchDemoCatalog((candidate) => candidate.identifiers?.includes(identifier) ?? false);
     }
+    this.assertCredentials();
 
     const cacheKey = `amazon:catalog:identifier:${identifierType}:${identifier}:${marketplaceId}`;
     const cached = await readCache<AmazonCatalogCandidate[]>(cacheKey, 15 * 60_000);
@@ -55,7 +109,7 @@ export class AmazonService {
         operation: "searchCatalogByIdentifier",
         requestKey: identifier,
         cacheHit: true,
-        message: "Served from file cache",
+        message: "Served from database cache",
         detail: { count: cached.length },
         scanJobId: context.scanJobId,
         savedSearchId: context.savedSearchId
@@ -102,11 +156,13 @@ export class AmazonService {
     context: RequestContext = {}
   ): Promise<AmazonCatalogCandidate[]> {
     const settings = await getAppSettings();
-    if (!env.hasAmazonCredentials || settings.demoModeOverride || env.demoModeRequested) {
+    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
+    if (explicitDemoMode) {
       return this.searchDemoCatalog((candidate) =>
-        candidate.title.toLowerCase().includes(keywords.toLowerCase().split(" ")[0] ?? "")
+        candidate.title.toLowerCase().includes((keywords.toLowerCase().split(" ")[0] ?? "").trim())
       );
     }
+    this.assertCredentials();
 
     const cacheKey = `amazon:catalog:keywords:${keywords}:${marketplaceId}`;
     const cached = await readCache<AmazonCatalogCandidate[]>(cacheKey, 15 * 60_000);
@@ -116,7 +172,7 @@ export class AmazonService {
         operation: "searchCatalogByKeywords",
         requestKey: keywords,
         cacheHit: true,
-        message: "Served from file cache",
+        message: "Served from database cache",
         detail: { count: cached.length },
         scanJobId: context.scanJobId,
         savedSearchId: context.savedSearchId
@@ -158,10 +214,12 @@ export class AmazonService {
 
   async getPricingForAsin(asin: string, marketplaceId: string, context: RequestContext = {}): Promise<PricingResult> {
     const settings = await getAppSettings();
-    if (!env.hasAmazonCredentials || settings.demoModeOverride || env.demoModeRequested) {
+    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
+    if (explicitDemoMode) {
       const pricingMap = await loadDemoAmazonPricing();
       return pricingMap[asin] ?? { amazonPrice: null, featuredOfferPrice: null };
     }
+    this.assertCredentials();
 
     const cacheKey = `amazon:pricing:${asin}:${marketplaceId}`;
     const cached = await readCache<PricingResult>(cacheKey, 10 * 60_000);
@@ -196,10 +254,12 @@ export class AmazonService {
     context: RequestContext = {}
   ): Promise<FeeResult> {
     const settings = await getAppSettings();
-    if (!env.hasAmazonCredentials || settings.demoModeOverride || env.demoModeRequested) {
+    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
+    if (explicitDemoMode) {
       const feeMap = await loadDemoAmazonFees();
       return feeMap[asin] ?? { feeEstimate: null, fulfillmentFee: null, referralFee: null };
     }
+    this.assertCredentials();
 
     const cacheKey = `amazon:fees:${asin}:${marketplaceId}:${price}`;
     const cached = await readCache<FeeResult>(cacheKey, 10 * 60_000);
@@ -235,6 +295,12 @@ export class AmazonService {
     const payload = this.mapFeePayload(response.data);
     await writeCache(cacheKey, payload);
     return payload;
+  }
+
+  private assertCredentials() {
+    if (!env.hasAmazonCredentials) {
+      throw new Error("Amazon credentials are missing. Configure SP-API credentials or enable demo mode explicitly.");
+    }
   }
 
   private async getLwaToken() {
@@ -322,7 +388,7 @@ export class AmazonService {
           "x-amz-date": amzDate,
           Authorization: authorization,
           "content-type": "application/json",
-          "user-agent": "ebay-canada-to-amazon-ca-fba-analyzer/1.0"
+          "user-agent": "ebay-canada-to-amazon-ca-arbitrage/2.0"
         },
         data: body
       },
@@ -343,15 +409,16 @@ export class AmazonService {
     const itemAny = item as Record<string, any>;
     const summary = itemAny.summaries?.[0] ?? {};
     const attributes = itemAny.attributes ?? {};
-    const identifiers = (itemAny.identifiers?.[0]?.identifiers ?? []).map((entry: { identifier?: string }) =>
-      String(entry.identifier ?? "")
-    );
+    const rawIdentifiers = itemAny.identifiers?.[0]?.identifiers ?? [];
+    const identifiers = rawIdentifiers
+      .map((entry: { identifier?: string }) => String(entry.identifier ?? "").trim())
+      .filter(Boolean);
 
     return {
       asin: String(item.asin ?? ""),
       title: String(summary.itemName ?? summary.itemClassification ?? "Unknown Amazon item"),
       brand: String(summary.brandName ?? "") || null,
-      model: String(attributes.model_name ?? "") || null,
+      model: String(attributes.model_name?.[0]?.value ?? attributes.model_name ?? "") || null,
       packageQuantity: Number(summary.packageQuantity ?? 0) || null,
       sizeColorVariant:
         [summary.sizeName, summary.colorName].filter(Boolean).map((value) => String(value)).join(" / ") || null,

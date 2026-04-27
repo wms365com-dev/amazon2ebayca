@@ -1,6 +1,5 @@
-import { Request, Response } from "express";
-
 import { OpportunityStatus, Prisma } from "@prisma/client";
+import { Request, Response } from "express";
 
 import { prisma } from "../db/prisma";
 import { opportunityNoteSchema, opportunityStatusSchema } from "../models/validators";
@@ -15,7 +14,7 @@ function parseBooleanQuery(value: unknown) {
 
 export async function listOpportunities(req: Request, res: Response) {
   const pagination = resolvePagination(req.query, 25);
-  const where: Prisma.OpportunityWhereInput = {};
+  const where: Prisma.ArbitrageOpportunityWhereInput = {};
   const minROI = Number(req.query.minROI);
   const minProfit = Number(req.query.minProfit);
   const minConfidence = Number(req.query.minConfidence);
@@ -45,18 +44,14 @@ export async function listOpportunities(req: Request, res: Response) {
     where.status = req.query.status as OpportunityStatus;
   }
   if (Number.isFinite(minConfidence)) {
-    where.amazonMatch = {
-      is: {
-        matchConfidence: { gte: minConfidence }
-      }
-    };
+    where.confidenceScore = { gte: minConfidence };
   }
 
-  const orderBy: Prisma.OpportunityOrderByWithRelationInput[] =
+  const orderBy: Prisma.ArbitrageOpportunityOrderByWithRelationInput[] =
     sortBy === "profit"
       ? [{ netProfit: "desc" }]
       : sortBy === "confidence"
-        ? [{ amazonMatch: { matchConfidence: "desc" } }, { roiPercent: "desc" }]
+        ? [{ confidenceScore: "desc" }, { roiPercent: "desc" }]
         : sortBy === "recent"
           ? [{ updatedAt: "desc" }]
           : [{ roiPercent: "desc" }, { netProfit: "desc" }];
@@ -65,15 +60,15 @@ export async function listOpportunities(req: Request, res: Response) {
     prisma.savedSearch.findMany({
       orderBy: { name: "asc" }
     }),
-    prisma.opportunity.count({ where }),
-    prisma.opportunity.findMany({
+    prisma.arbitrageOpportunity.count({ where }),
+    prisma.arbitrageOpportunity.findMany({
       where,
       orderBy,
       skip: pagination.skip,
       take: pagination.take,
       include: {
-        ebayListing: true,
-        amazonMatch: true,
+        sourceListing: true,
+        destinationListing: true,
         savedSearch: true
       }
     })
@@ -90,14 +85,19 @@ export async function listOpportunities(req: Request, res: Response) {
 
 export async function renderOpportunityDetail(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const opportunity = await prisma.opportunity.findUniqueOrThrow({
+  const opportunity = await prisma.arbitrageOpportunity.findUniqueOrThrow({
     where: { id },
     include: {
       savedSearch: true,
-      ebayListing: true,
-      amazonMatch: true,
+      sourceListing: true,
+      destinationListing: true,
+      listingMatch: true,
       statusHistory: {
         orderBy: { createdAt: "desc" }
+      },
+      snapshots: {
+        orderBy: { observedAt: "desc" },
+        take: 10
       }
     }
   });
@@ -136,7 +136,7 @@ export async function rescanOpportunityController(req: Request, res: Response) {
   } catch (error) {
     if (error instanceof ScanAlreadyRunningError) {
       redirectWithNotice(res, `/opportunities/${id}`, {
-        error: "This saved search is already scanning in the background."
+        error: "This scan profile is already running in the background."
       });
       return;
     }

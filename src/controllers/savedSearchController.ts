@@ -1,3 +1,4 @@
+import { Marketplace } from "@prisma/client";
 import { Request, Response } from "express";
 
 import { prisma } from "../db/prisma";
@@ -9,6 +10,9 @@ import { redirectWithNotice } from "../utils/redirect";
 function buildSavedSearchInput(body: Record<string, unknown>) {
   return savedSearchSchema.parse({
     name: sanitizeText(body.name),
+    sourceMarketplace: body.sourceMarketplace === Marketplace.AMAZON_CA ? Marketplace.AMAZON_CA : Marketplace.EBAY_CA,
+    destinationMarketplace:
+      body.destinationMarketplace === Marketplace.EBAY_CA ? Marketplace.EBAY_CA : Marketplace.AMAZON_CA,
     keywords: sanitizeText(body.keywords),
     categoryId: sanitizeText(body.categoryId),
     includeBrands: parseCommaList(body.includeBrands),
@@ -32,8 +36,8 @@ export async function listSavedSearches(req: Request, res: Response) {
     include: {
       _count: {
         select: {
-          opportunities: true,
-          scanJobs: true
+          scanJobs: true,
+          arbitrageOpportunities: true
         }
       },
       scanJobs: {
@@ -44,16 +48,17 @@ export async function listSavedSearches(req: Request, res: Response) {
   });
 
   res.render("searches/index", {
-    title: "Saved Searches",
+    title: "Scan Profiles",
     savedSearches
   });
 }
 
 export async function renderNewSavedSearch(req: Request, res: Response) {
   res.render("searches/form", {
-    title: "Create Saved Search",
+    title: "Create Scan Profile",
     formMode: "create",
-    search: null
+    search: null,
+    marketplaces: Object.values(Marketplace)
   });
 }
 
@@ -68,7 +73,7 @@ export async function createSavedSearch(req: Request, res: Response) {
     }
   });
 
-  redirectWithNotice(res, "/searches", { notice: "Saved search created." });
+  redirectWithNotice(res, "/searches", { notice: "Scan profile created." });
 }
 
 export async function renderEditSavedSearch(req: Request, res: Response) {
@@ -77,9 +82,10 @@ export async function renderEditSavedSearch(req: Request, res: Response) {
   });
 
   res.render("searches/form", {
-    title: "Edit Saved Search",
+    title: "Edit Scan Profile",
     formMode: "edit",
-    search
+    search,
+    marketplaces: Object.values(Marketplace)
   });
 }
 
@@ -92,7 +98,7 @@ export async function updateSavedSearch(req: Request, res: Response) {
     data
   });
 
-  redirectWithNotice(res, "/searches", { notice: "Saved search updated." });
+  redirectWithNotice(res, "/searches", { notice: "Scan profile updated." });
 }
 
 export async function deleteSavedSearch(req: Request, res: Response) {
@@ -102,7 +108,7 @@ export async function deleteSavedSearch(req: Request, res: Response) {
     where: { id }
   });
 
-  redirectWithNotice(res, "/searches", { notice: "Saved search deleted." });
+  redirectWithNotice(res, "/searches", { notice: "Scan profile deleted." });
 }
 
 export async function runSavedSearchScan(req: Request, res: Response) {
@@ -113,7 +119,7 @@ export async function runSavedSearchScan(req: Request, res: Response) {
     redirectWithNotice(res, "/searches", { notice: "Scan completed." });
   } catch (error) {
     if (error instanceof ScanAlreadyRunningError) {
-      redirectWithNotice(res, "/searches", { error: "That search is already scanning in the background." });
+      redirectWithNotice(res, "/searches", { error: "That scan profile is already running in the background." });
       return;
     }
 

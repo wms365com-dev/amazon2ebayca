@@ -28,7 +28,7 @@ export function createApp() {
   app.use((req, res, next) => {
     void (async () => {
       const settings = await getAppSettings();
-      res.locals.appName = "eBay Canada to Amazon.ca FBA Analyzer";
+      res.locals.appName = "Amazon.ca <-> eBay.ca Arbitrage Analyzer";
       res.locals.currentPath = req.path;
       res.locals.notice = req.query.notice;
       res.locals.error = req.query.error;

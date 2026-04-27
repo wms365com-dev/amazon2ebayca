@@ -6,20 +6,20 @@
   <section class="page-intro">
     <div>
       <h1>Settings</h1>
-      <p>Secrets stay in environment variables. This page manages marketplace defaults, conservative cost assumptions, and scheduler behavior.</p>
+      <p>Keep connector credentials in Railway environment variables and tune the conservative defaults used for each marketplace direction.</p>
     </div>
   </section>
 
   <section class="status-grid">
     <article class="panel compact">
-      <h2>eBay credentials</h2>
+      <h2>eBay connector</h2>
       <p><span class="badge <%= envStatus.ebayConfigured ? 'active-badge' : 'inactive-badge' %>"><%= envStatus.ebayConfigured ? 'Configured' : 'Missing' %></span></p>
       <p class="muted">Environment: <%= envStatus.ebayEnvironment %></p>
     </article>
     <article class="panel compact">
-      <h2>Amazon SP-API</h2>
+      <h2>Amazon connector</h2>
       <p><span class="badge <%= envStatus.amazonConfigured ? 'active-badge' : 'inactive-badge' %>"><%= envStatus.amazonConfigured ? 'Configured' : 'Missing' %></span></p>
-      <p class="muted">Canada marketplace default is preloaded.</p>
+      <p class="muted">Amazon Canada marketplace is preloaded by default.</p>
     </article>
   </section>
 
@@ -33,7 +33,7 @@
       </label>
 
       <label>
-        <span>Default inbound cost</span>
+        <span>Default Amazon inbound cost</span>
         <input type="number" step="0.01" name="defaultInboundCost" value="<%= settings.defaultInboundCost %>" />
       </label>
 
@@ -53,6 +53,21 @@
       </label>
 
       <label>
+        <span>Default outbound shipping cost</span>
+        <input type="number" step="0.01" name="defaultOutboundShippingCost" value="<%= settings.defaultOutboundShippingCost %>" />
+      </label>
+
+      <label>
+        <span>Default eBay final value fee rate</span>
+        <input type="number" step="0.01" min="0" max="1" name="defaultEbayFinalValueFeePercent" value="<%= settings.defaultEbayFinalValueFeePercent %>" />
+      </label>
+
+      <label>
+        <span>Default eBay fixed fee</span>
+        <input type="number" step="0.01" min="0" name="defaultEbayFixedFee" value="<%= settings.defaultEbayFixedFee %>" />
+      </label>
+
+      <label>
         <span>Sales tax rate</span>
         <input type="number" step="0.01" min="0" max="1" name="salesTaxRate" value="<%= settings.salesTaxRate %>" />
       </label>
@@ -64,7 +79,7 @@
 
       <label class="toggle">
         <input type="checkbox" name="schedulerEnabled" <%= settings.schedulerEnabled ? 'checked' : '' %> />
-        <span>Enable scheduler</span>
+        <span>Enable background scanning</span>
       </label>
 
       <label class="toggle">
@@ -74,7 +89,7 @@
 
       <label class="toggle">
         <input type="checkbox" name="demoModeOverride" <%= settings.demoModeOverride ? 'checked' : '' %> />
-        <span>Force demo mode</span>
+        <span>Force explicit demo mode</span>
       </label>
 
       <div class="form-actions">

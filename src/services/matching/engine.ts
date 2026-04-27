@@ -71,7 +71,7 @@ function scoreCandidate(
     warnings.push(variantComparison.note ?? "Variant mismatch");
   }
   if (!conditionCompatible) {
-    warnings.push("Condition may not be suitable for FBA");
+    warnings.push("Condition may not be suitable for Amazon resale");
   }
 
   return { candidate, confidence, method, reasons, warnings };

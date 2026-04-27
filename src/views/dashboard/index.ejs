@@ -6,17 +6,17 @@
   <section class="page-intro">
     <div>
       <h1>Dashboard</h1>
-      <p>Track saved searches, scan history, throttling, and the most promising Amazon.ca FBA opportunities.</p>
+      <p>Track bi-directional scan profiles, historical opportunities, and the strongest marketplace arbitrage candidates.</p>
     </div>
     <div class="intro-actions">
-      <a href="/searches/new" class="button">New search</a>
+      <a href="/searches/new" class="button">New profile</a>
       <a href="/opportunities?profitableOnly=true" class="button secondary">Profitable only</a>
     </div>
   </section>
 
   <section class="metric-grid">
     <article class="metric-card">
-      <span class="metric-label">Active searches</span>
+      <span class="metric-label">Active profiles</span>
       <strong><%= metrics.totalActiveSearches %></strong>
     </article>
     <article class="metric-card">
@@ -41,13 +41,13 @@
     <article class="panel">
       <div class="panel-head">
         <h2>Latest scans</h2>
-        <a href="/searches" class="text-link">Manage searches</a>
+        <a href="/searches" class="text-link">Manage profiles</a>
       </div>
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>Search</th>
+              <th>Profile</th>
               <th>Status</th>
               <th>Items</th>
               <th>Started</th>
@@ -82,7 +82,7 @@
         <% topOpportunities.forEach((item) => { %>
           <a href="/opportunities/<%= item.id %>" class="opportunity-card">
             <div>
-              <strong><%= item.ebayListing.title %></strong>
+              <strong><%= item.sourceListing.title %></strong>
               <div class="muted"><%= item.savedSearch.name %></div>
             </div>
             <div class="opportunity-meta">

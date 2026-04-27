@@ -20,11 +20,11 @@ export async function renderAdmin(req: Request, res: Response) {
       take: 20,
       include: { savedSearch: true }
     }),
-    prisma.opportunity.findMany({
-      where: { amazonMatchId: null },
+    prisma.arbitrageOpportunity.findMany({
+      where: { destinationListingId: null },
       orderBy: { updatedAt: "desc" },
       take: 10,
-      include: { savedSearch: true, ebayListing: true }
+      include: { savedSearch: true, sourceListing: true }
     })
   ]);
 
@@ -48,7 +48,7 @@ export async function retryScanJob(req: Request, res: Response) {
     redirectWithNotice(res, "/admin", { notice: "Retry completed." });
   } catch (error) {
     if (error instanceof ScanAlreadyRunningError) {
-      redirectWithNotice(res, "/admin", { error: "That saved search is already scanning in the background." });
+      redirectWithNotice(res, "/admin", { error: "That scan profile is already running in the background." });
       return;
     }
 

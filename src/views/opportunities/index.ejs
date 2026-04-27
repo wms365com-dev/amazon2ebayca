@@ -6,7 +6,7 @@
   <section class="page-intro">
     <div>
       <h1>Opportunities</h1>
-      <p>Filter for profitable, higher-confidence matches and move promising items into Buy, Watch, Reject, or Review.</p>
+      <p>Review both `eBay -> Amazon` and `Amazon -> eBay` opportunities, using stored listing history and current destination estimates.</p>
     </div>
   </section>
 
@@ -33,7 +33,7 @@
         <input type="number" min="0" max="100" name="maxRisk" value="<%= filters.maxRisk ?? '' %>" />
       </label>
       <label>
-        <span>Source search</span>
+        <span>Scan profile</span>
         <select name="sourceSearchId">
           <option value="">All</option>
           <% savedSearches.forEach((search) => { %>
@@ -72,15 +72,13 @@
         <thead>
           <tr>
             <th>Image</th>
-            <th>eBay title</th>
-            <th>eBay price</th>
-            <th>Shipping</th>
-            <th>Landed</th>
-            <th>ASIN</th>
-            <th>Amazon title</th>
-            <th>Amazon price</th>
+            <th>Direction</th>
+            <th>Source listing</th>
+            <th>Source cost</th>
+            <th>Destination listing</th>
+            <th>Expected revenue</th>
             <th>Fees</th>
-            <th>Inbound / prep</th>
+            <th>Fulfillment</th>
             <th>Net profit</th>
             <th>ROI</th>
             <th>Confidence</th>
@@ -91,39 +89,37 @@
         </thead>
         <tbody>
           <% if (opportunities.length === 0) { %>
-            <tr><td colspan="16" class="empty">No opportunities matched your current filters.</td></tr>
+            <tr><td colspan="14" class="empty">No opportunities matched your current filters.</td></tr>
           <% } %>
           <% opportunities.forEach((item) => { %>
             <tr>
               <td>
-                <% if (item.ebayListing.imageUrl) { %>
-                  <img src="<%= item.ebayListing.imageUrl %>" alt="eBay item" class="thumb" />
+                <% if (item.sourceListing.imageUrl) { %>
+                  <img src="<%= item.sourceListing.imageUrl %>" alt="Source item" class="thumb" />
                 <% } else { %>
                   <div class="thumb placeholder"></div>
                 <% } %>
               </td>
+              <td><span class="badge"><%= item.savedSearch.sourceMarketplace %> -> <%= item.savedSearch.destinationMarketplace %></span></td>
               <td>
-                <a href="/opportunities/<%= item.id %>"><strong><%= item.ebayListing.title %></strong></a>
+                <a href="/opportunities/<%= item.id %>"><strong><%= item.sourceListing.title %></strong></a>
                 <div class="muted"><%= item.savedSearch.name %></div>
               </td>
-              <td><%= formatCurrency(item.ebayItemCost) %></td>
-              <td><%= formatCurrency(item.ebayShippingCost) %></td>
-              <td><%= formatCurrency(item.totalLandedCost) %></td>
-              <td><%= item.amazonMatch?.asin ?? '--' %></td>
-              <td><%= item.amazonMatch?.amazonTitle ?? 'No confident match yet' %></td>
-              <td><%= formatCurrency(item.amazonSellPrice) %></td>
-              <td><%= formatCurrency(item.amazonFeeEstimate) %></td>
-              <td><%= formatCurrency(item.inboundCostEstimate + item.prepCostEstimate + item.labelCostEstimate) %></td>
+              <td><%= formatCurrency(item.sourceItemCost + item.sourceShippingCost) %></td>
+              <td><%= item.destinationListing?.title ?? 'No confident destination match yet' %></td>
+              <td><%= formatCurrency(item.destinationSellPrice) %></td>
+              <td><%= formatCurrency(item.destinationFeeEstimate) %></td>
+              <td><%= formatCurrency(item.fulfillmentCostEstimate + item.prepCostEstimate + item.labelCostEstimate) %></td>
               <td><span class="profit <%= item.netProfit >= 0 ? 'positive' : 'negative' %>"><%= formatCurrency(item.netProfit) %></span></td>
               <td><span class="badge"><%= item.roiPercent.toFixed(1) %>%</span></td>
-              <td><span class="badge confidence"><%= item.amazonMatch?.matchConfidence ?? 0 %></span></td>
+              <td><span class="badge confidence"><%= item.confidenceScore %></span></td>
               <td><span class="badge risk risk-<%= item.riskScore >= 70 ? 'high' : item.riskScore >= 40 ? 'medium' : 'low' %>"><%= item.riskScore %></span></td>
               <td><span class="badge status-<%= item.status.toLowerCase() %>"><%= item.status %></span></td>
               <td>
                 <div class="action-stack">
-                  <a href="<%= item.ebayListing.itemWebUrl %>" class="text-link" target="_blank" rel="noreferrer">eBay</a>
-                  <% if (item.amazonMatch?.asin) { %>
-                    <a href="https://www.amazon.ca/dp/<%= item.amazonMatch.asin %>" class="text-link" target="_blank" rel="noreferrer">Amazon</a>
+                  <a href="<%= item.sourceListing.listingUrl %>" class="text-link" target="_blank" rel="noreferrer">Source</a>
+                  <% if (item.destinationListing?.listingUrl) { %>
+                    <a href="<%= item.destinationListing.listingUrl %>" class="text-link" target="_blank" rel="noreferrer">Destination</a>
                   <% } %>
                   <form method="post" action="/opportunities/<%= item.id %>/rescan">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />

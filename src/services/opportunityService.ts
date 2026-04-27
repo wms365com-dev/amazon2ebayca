@@ -7,7 +7,7 @@ export async function updateOpportunityStatus(
   status: OpportunityStatus,
   note?: string
 ) {
-  const current = await prisma.opportunity.findUniqueOrThrow({
+  const current = await prisma.arbitrageOpportunity.findUniqueOrThrow({
     where: { id: opportunityId }
   });
 
@@ -15,12 +15,12 @@ export async function updateOpportunityStatus(
     return current;
   }
 
-  const updated = await prisma.opportunity.update({
+  const updated = await prisma.arbitrageOpportunity.update({
     where: { id: opportunityId },
     data: { status }
   });
 
-  await prisma.opportunityStatusHistory.create({
+  await prisma.arbitrageOpportunityStatusHistory.create({
     data: {
       opportunityId,
       fromStatus: current.status,
@@ -33,7 +33,7 @@ export async function updateOpportunityStatus(
 }
 
 export async function saveOpportunityNotes(opportunityId: number, notes: string) {
-  return prisma.opportunity.update({
+  return prisma.arbitrageOpportunity.update({
     where: { id: opportunityId },
     data: { notes }
   });

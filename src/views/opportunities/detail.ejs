@@ -6,7 +6,7 @@
   <section class="page-intro">
     <div>
       <h1>Opportunity Detail</h1>
-      <p>Review the listing, Amazon match, assumptions, risk flags, and status history before making a sourcing decision.</p>
+      <p>Review the source listing, destination estimate, historical snapshots, and workflow notes before making a sourcing decision.</p>
     </div>
     <div class="intro-actions">
       <a href="/opportunities" class="button secondary">Back to list</a>
@@ -16,51 +16,56 @@
   <section class="detail-grid">
     <article class="panel">
       <div class="panel-head">
-        <h2>eBay listing summary</h2>
-        <a href="<%= opportunity.ebayListing.itemWebUrl %>" target="_blank" rel="noreferrer" class="text-link">Open eBay listing</a>
+        <h2>Source listing</h2>
+        <a href="<%= opportunity.sourceListing.listingUrl %>" target="_blank" rel="noreferrer" class="text-link">Open source listing</a>
       </div>
       <div class="detail-card">
-        <% if (opportunity.ebayListing.imageUrl) { %>
-          <img src="<%= opportunity.ebayListing.imageUrl %>" alt="eBay item image" class="detail-image" />
+        <% if (opportunity.sourceListing.imageUrl) { %>
+          <img src="<%= opportunity.sourceListing.imageUrl %>" alt="Source item image" class="detail-image" />
         <% } %>
         <div class="detail-copy">
-          <strong><%= opportunity.ebayListing.title %></strong>
-          <p class="muted">Condition: <%= opportunity.ebayListing.condition ?? 'Unknown' %></p>
-          <p class="muted">Brand: <%= opportunity.ebayListing.brand ?? 'Unknown' %> | UPC: <%= opportunity.ebayListing.upc ?? opportunity.ebayListing.gtin ?? '--' %></p>
-          <p class="muted">Seller: <%= opportunity.ebayListing.sellerUsername ?? 'Unknown' %> | Feedback: <%= opportunity.ebayListing.sellerFeedbackPercentage ?? '--' %>%</p>
+          <strong><%= opportunity.sourceListing.title %></strong>
+          <p class="muted">Marketplace: <%= opportunity.sourceListing.marketplace %></p>
+          <p class="muted">Condition: <%= opportunity.sourceListing.condition ?? 'Unknown' %></p>
+          <p class="muted">Brand: <%= opportunity.sourceListing.brand ?? 'Unknown' %> | UPC: <%= opportunity.sourceListing.upc ?? opportunity.sourceListing.gtin ?? '--' %></p>
+          <% if (opportunity.sourceListing.sellerName) { %>
+            <p class="muted">Seller: <%= opportunity.sourceListing.sellerName %> | Feedback: <%= opportunity.sourceListing.sellerFeedbackPercentage ?? '--' %>%</p>
+          <% } %>
         </div>
       </div>
     </article>
 
     <article class="panel">
       <div class="panel-head">
-        <h2>Amazon match</h2>
-        <% if (opportunity.amazonMatch?.asin) { %>
-          <a href="https://www.amazon.ca/dp/<%= opportunity.amazonMatch.asin %>" target="_blank" rel="noreferrer" class="text-link">Open Amazon ASIN</a>
+        <h2>Destination listing</h2>
+        <% if (opportunity.destinationListing?.listingUrl) { %>
+          <a href="<%= opportunity.destinationListing.listingUrl %>" target="_blank" rel="noreferrer" class="text-link">Open destination listing</a>
         <% } %>
       </div>
-      <% if (opportunity.amazonMatch) { %>
+      <% if (opportunity.destinationListing) { %>
         <div class="detail-card">
-          <% if (opportunity.amazonMatch.imageUrl) { %>
-            <img src="<%= opportunity.amazonMatch.imageUrl %>" alt="Amazon item image" class="detail-image" />
+          <% if (opportunity.destinationListing.imageUrl) { %>
+            <img src="<%= opportunity.destinationListing.imageUrl %>" alt="Destination item image" class="detail-image" />
           <% } %>
           <div class="detail-copy">
-            <strong><%= opportunity.amazonMatch.amazonTitle %></strong>
-            <p class="muted">ASIN: <%= opportunity.amazonMatch.asin %></p>
-            <p class="muted">Confidence: <span class="badge confidence"><%= opportunity.amazonMatch.matchConfidence %></span></p>
-            <p class="muted">Method: <%= opportunity.amazonMatch.matchMethod %></p>
+            <strong><%= opportunity.destinationListing.title %></strong>
+            <p class="muted">Marketplace: <%= opportunity.destinationListing.marketplace %></p>
+            <p class="muted">Confidence: <span class="badge confidence"><%= opportunity.confidenceScore %></span></p>
+            <% if (opportunity.listingMatch) { %>
+              <p class="muted">Method: <%= opportunity.listingMatch.matchMethod %></p>
+            <% } %>
           </div>
         </div>
         <div class="tag-list">
-          <% (Array.isArray(opportunity.amazonMatch.matchReasons) ? opportunity.amazonMatch.matchReasons : []).forEach((reason) => { %>
+          <% (Array.isArray(opportunity.listingMatch?.reasons) ? opportunity.listingMatch.reasons : []).forEach((reason) => { %>
             <span class="tag success"><%= reason %></span>
           <% }) %>
-          <% (Array.isArray(opportunity.amazonMatch.matchWarnings) ? opportunity.amazonMatch.matchWarnings : []).forEach((warning) => { %>
+          <% (Array.isArray(opportunity.listingMatch?.warnings) ? opportunity.listingMatch.warnings : []).forEach((warning) => { %>
             <span class="tag warning"><%= warning %></span>
           <% }) %>
         </div>
       <% } else { %>
-        <p class="empty">No confident Amazon.ca match was stored yet.</p>
+        <p class="empty">No confident destination listing was stored yet.</p>
       <% } %>
     </article>
   </section>
@@ -69,15 +74,18 @@
     <article class="panel">
       <h2>Pricing breakdown</h2>
       <dl class="stats-list">
-        <div><dt>eBay item cost</dt><dd><%= formatCurrency(opportunity.ebayItemCost) %></dd></div>
-        <div><dt>eBay shipping</dt><dd><%= formatCurrency(opportunity.ebayShippingCost) %></dd></div>
-        <div><dt>Inbound cost</dt><dd><%= formatCurrency(opportunity.inboundCostEstimate) %></dd></div>
+        <div><dt>Direction</dt><dd><%= opportunity.savedSearch.sourceMarketplace %> -> <%= opportunity.savedSearch.destinationMarketplace %></dd></div>
+        <div><dt>Source item cost</dt><dd><%= formatCurrency(opportunity.sourceItemCost) %></dd></div>
+        <div><dt>Source shipping</dt><dd><%= formatCurrency(opportunity.sourceShippingCost) %></dd></div>
+        <div><dt>Source fees</dt><dd><%= formatCurrency(opportunity.sourceFeeEstimate) %></dd></div>
+        <div><dt>Destination expected revenue</dt><dd><%= formatCurrency(opportunity.destinationSellPrice) %></dd></div>
+        <div><dt>Recovered shipping credit</dt><dd><%= formatCurrency(opportunity.destinationShippingCredit) %></dd></div>
+        <div><dt>Destination fees</dt><dd><%= formatCurrency(opportunity.destinationFeeEstimate) %></dd></div>
+        <div><dt>Fulfillment cost</dt><dd><%= formatCurrency(opportunity.fulfillmentCostEstimate) %></dd></div>
         <div><dt>Prep cost</dt><dd><%= formatCurrency(opportunity.prepCostEstimate) %></dd></div>
         <div><dt>Label cost</dt><dd><%= formatCurrency(opportunity.labelCostEstimate) %></dd></div>
         <div><dt>Other costs</dt><dd><%= formatCurrency(opportunity.otherCostEstimate) %></dd></div>
-        <div><dt>Total landed cost</dt><dd><%= formatCurrency(opportunity.totalLandedCost) %></dd></div>
-        <div><dt>Amazon sell price</dt><dd><%= formatCurrency(opportunity.amazonSellPrice) %></dd></div>
-        <div><dt>Amazon fees</dt><dd><%= formatCurrency(opportunity.amazonFeeEstimate) %></dd></div>
+        <div><dt>Total cost</dt><dd><%= formatCurrency(opportunity.totalCost) %></dd></div>
         <div><dt>Net profit</dt><dd class="<%= opportunity.netProfit >= 0 ? 'positive' : 'negative' %>"><%= formatCurrency(opportunity.netProfit) %></dd></div>
         <div><dt>ROI</dt><dd><%= opportunity.roiPercent.toFixed(1) %>%</dd></div>
         <div><dt>Margin</dt><dd><%= opportunity.marginPercent.toFixed(1) %>%</dd></div>
@@ -87,7 +95,7 @@
 
     <article class="panel">
       <h2>Assumptions and risk</h2>
-      <p class="muted">Marketplace ID: <%= settings.amazonMarketplaceId %></p>
+      <p class="muted">Amazon marketplace ID: <%= settings.amazonMarketplaceId %></p>
       <p class="muted">Sales tax assumption: <%= settings.applySalesTax ? `On (${(settings.salesTaxRate * 100).toFixed(0)}%)` : 'Off' %></p>
       <p class="muted">Current status: <span class="badge status-<%= opportunity.status.toLowerCase() %>"><%= opportunity.status %></span></p>
       <p class="muted">Risk score: <span class="badge risk risk-<%= opportunity.riskScore >= 70 ? 'high' : opportunity.riskScore >= 40 ? 'medium' : 'low' %>"><%= opportunity.riskScore %></span></p>
@@ -130,7 +138,7 @@
       <h3>Notes</h3>
       <form method="post" action="/opportunities/<%= opportunity.id %>/notes" class="stack-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-        <textarea name="notes" rows="6" placeholder="Add sourcing notes, review follow-ups, or restriction checks."><%= opportunity.notes ?? '' %></textarea>
+        <textarea name="notes" rows="6" placeholder="Add sourcing notes, buyer questions, or listing improvement ideas."><%= opportunity.notes ?? '' %></textarea>
         <button type="submit" class="button">Save notes</button>
       </form>
     </article>
@@ -143,9 +151,20 @@
         <% } %>
         <% opportunity.statusHistory.forEach((entry) => { %>
           <div class="timeline-item">
-            <strong><%= entry.fromStatus ?? 'Created' %> → <%= entry.toStatus %></strong>
+            <strong><%= entry.fromStatus ?? 'Created' %> -> <%= entry.toStatus %></strong>
             <div class="muted"><%= formatDateTime(entry.createdAt) %></div>
             <% if (entry.note) { %><div><%= entry.note %></div><% } %>
+          </div>
+        <% }) %>
+      </div>
+
+      <h3>Recent pricing history</h3>
+      <div class="timeline">
+        <% opportunity.snapshots.forEach((snapshot) => { %>
+          <div class="timeline-item">
+            <strong><%= formatCurrency(snapshot.netProfit) %> profit</strong>
+            <div class="muted"><%= formatDateTime(snapshot.observedAt) %></div>
+            <div>ROI <%= snapshot.roiPercent.toFixed(1) %>% | Risk <%= snapshot.riskScore %></div>
           </div>
         <% }) %>
       </div>

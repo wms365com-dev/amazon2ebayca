@@ -3,7 +3,7 @@
     <div class="brand-block">
       <a href="/dashboard" class="brand-mark"><%= appName %></a>
       <div class="brand-subline">
-        Amazon.ca marketplace
+        eBay.ca and Amazon.ca arbitrage
         <% if (isDemoMode) { %>
           <span class="badge badge-demo">Demo Mode</span>
         <% } %>
@@ -11,7 +11,7 @@
     </div>
     <nav class="site-nav">
       <a href="/dashboard" class="<%= currentPath.startsWith('/dashboard') || currentPath === '/' ? 'active' : '' %>">Dashboard</a>
-      <a href="/searches" class="<%= currentPath.startsWith('/searches') ? 'active' : '' %>">Saved Searches</a>
+      <a href="/searches" class="<%= currentPath.startsWith('/searches') ? 'active' : '' %>">Scan Profiles</a>
       <a href="/opportunities" class="<%= currentPath.startsWith('/opportunities') ? 'active' : '' %>">Opportunities</a>
       <a href="/settings" class="<%= currentPath.startsWith('/settings') ? 'active' : '' %>">Settings</a>
       <a href="/admin" class="<%= currentPath.startsWith('/admin') ? 'active' : '' %>">Admin / Logs</a>

@@ -1,34 +1,50 @@
-# eBay Canada to Amazon.ca FBA Analyzer
+# Amazon.ca <-> eBay.ca Arbitrage Analyzer
 
-Production-ready MVP for sourcing profitable products from eBay Canada and evaluating whether they can be resold on Amazon.ca via FBA.
+Production-quality TypeScript app for marketplace arbitrage between Amazon Canada and eBay Canada.
 
-The app is built for speed and reliability first:
+This rebuild moves the project beyond the original one-way FBA MVP. It now treats each scan as a direction-aware arbitrage workflow:
 
-- Backend: Node.js, Express, TypeScript
-- Database: SQLite + Prisma
-- Frontend: EJS server-rendered pages + minimal vanilla JS
-- Scheduling: `node-cron` plus a Railway-friendly one-shot scan runner
-- Validation: Zod
-- Logging: pino
-- Testing: Vitest
-- Deployment target: Railway
+- `eBay.ca -> Amazon.ca`
+- `Amazon.ca -> eBay.ca`
+
+It also stores historical scan data in the database so opportunities can be rescanned, compared over time, and reviewed like a seller workflow instead of a one-time calculator.
 
 ## What It Does
 
-The MVP supports this workflow:
+The app supports this workflow:
 
-1. Create a saved eBay Canada search profile.
-2. Run a scan manually or let scheduled scans run automatically.
-3. Normalize eBay listing data.
-4. Attempt to match each listing to an Amazon.ca ASIN.
-5. Pull price and fee signals.
-6. Estimate inbound, prep, label, and optional sales tax costs.
-7. Calculate total landed cost, net profit, margin, ROI, and break-even.
-8. Score risk and match confidence.
-9. Review opportunities in a sortable/filterable table.
-10. Mark opportunities as `NEW`, `WATCH`, `BUY`, `REJECT`, or `REVIEW`.
+1. Create a `Scan Profile`
+2. Choose a source marketplace and destination marketplace
+3. Search the source marketplace for listings
+4. Normalize and store source listings locally
+5. Attempt a destination-marketplace match
+6. Estimate pricing, fees, fulfillment, prep, labeling, tax, and other costs
+7. Calculate profit, ROI, margin, and break-even
+8. Score risk and confidence
+9. Persist snapshots so rescans build history instead of overwriting everything
+10. Review and update each opportunity with workflow statuses
 
-If live credentials are missing, the app automatically falls back to demo fixtures so you can preview the UI and full workflow without blocking on setup.
+## Key Changes In This Rebuild
+
+- The app is now marketplace-direction aware instead of hardcoded to `eBay -> Amazon`
+- Listings are stored in a neutral `MarketplaceListing` table
+- Historical listing prices are stored in `ListingSnapshot`
+- Match results are stored in `ListingMatch`
+- Opportunities are stored in `ArbitrageOpportunity`
+- Rescan history is stored in `ArbitrageOpportunitySnapshot`
+- API cache entries are stored in SQLite instead of JSON cache files
+- Demo mode is now explicit instead of silently turning on when credentials are missing
+
+## Stack
+
+- Backend: Node.js + Express + TypeScript
+- Database: SQLite + Prisma ORM
+- Frontend: EJS server-rendered pages + minimal vanilla JS
+- Validation: Zod
+- Logging: pino
+- Scheduling: `node-cron`
+- Tests: Vitest
+- Deployment target: Railway
 
 ## Project Tree
 
@@ -53,7 +69,9 @@ If live credentials are missing, the app automatically falls back to demo fixtur
 |   |-- migrations
 |   |   |-- 202604110001_init
 |   |   |   `-- migration.sql
-|   |   `-- 202604120001_scan_leases
+|   |   |-- 202604120001_scan_leases
+|   |   |   `-- migration.sql
+|   |   `-- 202604260001_marketplace_arbitrage_rebuild
 |   |       `-- migration.sql
 |   |-- schema.prisma
 |   `-- seed.ts
@@ -145,50 +163,74 @@ If live credentials are missing, the app automatically falls back to demo fixtur
     `-- riskEngine.test.ts
 ```
 
+## Database Model
+
+The app keeps arbitrage data in SQLite through Prisma.
+
+Core tables in the rebuilt model:
+
+- `SavedSearch`
+  This now behaves as a scan profile and stores the source and destination marketplace direction.
+- `MarketplaceListing`
+  Stores normalized source or destination listings from either marketplace.
+- `ListingSnapshot`
+  Stores observed listing price and shipping history over time.
+- `ListingMatch`
+  Stores match confidence, method, reasons, and warnings.
+- `ArbitrageOpportunity`
+  Stores the current derived opportunity record used by the UI.
+- `ArbitrageOpportunitySnapshot`
+  Stores rescans and pricing history for each opportunity.
+- `ArbitrageOpportunityStatusHistory`
+  Stores workflow changes like `NEW`, `WATCH`, `BUY`, `REJECT`, and `REVIEW`.
+- `ApiCacheEntry`
+  Stores connector response cache entries in the database.
+- Legacy tables
+  Older one-way MVP tables remain present for compatibility during the transition.
+
 ## Local Setup
 
-1. Install dependencies:
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-2. Copy the environment template:
+2. Copy the environment template
 
 ```bash
 cp .env.example .env
 ```
 
-On Windows PowerShell:
+Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-3. Initialize the SQLite database and Prisma client:
+3. Generate Prisma client and apply migrations
 
 ```bash
 npx prisma generate
 npx prisma migrate deploy
 ```
 
-4. Start the app:
+4. Seed starter data
+
+```bash
+npm run db:seed
+```
+
+5. Start the app
 
 ```bash
 npm run dev
 ```
 
-5. Open:
+6. Open
 
 ```text
 http://localhost:3000
-```
-
-### Optional Production-Style Local Run
-
-```bash
-npm run build
-npm start
 ```
 
 ## Environment Variables
@@ -219,73 +261,150 @@ DEMO_MODE=true
 Notes:
 
 - `AMAZON_MARKETPLACE_ID` defaults to Amazon Canada: `A2EUQ1WTGCTBG2`
-- `INTERNAL_SCHEDULER_ENABLED=true` keeps the original in-process scheduler active
-- `SCAN_LOCK_TIMEOUT_MINUTES` controls how long a saved search stays leased before another worker can safely take over
-- `DEMO_MODE=true` forces fixtures even if credentials exist
-- UI-editable operational settings are stored in SQLite, but secrets remain environment-only
+- `INTERNAL_SCHEDULER_ENABLED=true` keeps scheduled scans inside the web process
+- `SCAN_LOCK_TIMEOUT_MINUTES` controls scan lease expiry
+- secrets stay in environment variables, not in the settings table
 
 ## Demo Mode
 
-Demo mode is active when any of these are true:
+Demo mode is now explicit.
+
+It is active when either of these are true:
 
 - `DEMO_MODE=true`
-- eBay credentials are missing
-- Amazon SP-API credentials are missing
-- the in-app settings page has `Force demo mode` enabled
+- the settings page has `Force explicit demo mode` enabled
 
 When demo mode is active:
 
 - the header shows a `Demo Mode` badge
-- a default saved search is auto-seeded on first boot
-- scans use JSON fixtures from `data/fixtures`
-- the full UI still works, including scanning, opportunity scoring, notes, and status changes
+- seeded sample profiles are available
+- scans use fixtures from `data/fixtures`
+- the UI still persists scans, snapshots, notes, and statuses to the database
 
-This lets you validate the product flow without live API access.
+Important:
 
-## Data Storage on Railway
+- missing eBay or Amazon credentials no longer silently enable demo mode
+- if a connector is required for a scan profile and its credentials are missing, the scan fails with a clear error
 
-The app already stores listings and scan results locally through Prisma + SQLite.
+## How Scanning Works
 
-With a Railway volume mounted at `/data` and:
+Each scan profile has:
 
-```env
-DATABASE_URL=file:/data/railway.db
-```
+- source marketplace
+- destination marketplace
+- keywords
+- optional brand/category/price filters
+- profitability thresholds
+- scan frequency
 
-the following records persist across deploys and restarts:
+At scan time the app:
 
-- saved searches
-- eBay listings
-- Amazon matches
-- opportunities
-- status history
+1. fetches source marketplace listings
+2. stores or updates `MarketplaceListing`
+3. writes a `ListingSnapshot`
+4. attempts a destination match
+5. calculates fees and profit
+6. scores confidence and risk
+7. updates or creates `ArbitrageOpportunity`
+8. writes an `ArbitrageOpportunitySnapshot`
+
+Supported directions today:
+
+- `eBay.ca -> Amazon.ca`
+- `Amazon.ca -> eBay.ca`
+
+Current destination estimation behavior:
+
+- `eBay -> Amazon` uses Amazon catalog, pricing, and fee estimates
+- `Amazon -> eBay` uses active eBay listing comps and configurable eBay fee assumptions
+
+## Data Persistence
+
+This rebuild is designed to keep history in the database.
+
+Persisted records include:
+
+- scan profiles
+- source and destination listings
+- listing snapshots
+- match evidence
+- opportunity records
+- opportunity snapshots
+- opportunity status history
 - scan jobs
 - API logs
-- app settings
+- connector cache entries
 
-For this MVP, volume-backed SQLite is enough. If you later need multi-user scale or stronger reporting workflows, Railway Postgres is the natural next step.
+This means rescans add history instead of only replacing a single current value.
 
 ## Railway Deployment
 
-### Web Service
+### Recommended MVP Deployment
 
-1. Create a new Railway project from this repository.
-2. Add a persistent volume and mount it to `/data`.
-3. Set these variables on the web service:
+For the current SQLite-based MVP, the simplest production setup is:
+
+1. Create one Railway web service from this repository
+2. Attach one persistent volume to that service
+3. Mount it at `/data`
+4. Set:
 
 ```env
 NODE_ENV=production
 DATABASE_URL=file:/data/railway.db
 APP_BASE_URL=https://your-app.up.railway.app
 AMAZON_MARKETPLACE_ID=A2EUQ1WTGCTBG2
-DEMO_MODE=true
 EBAY_ENVIRONMENT=production
 AMAZON_SPAPI_AWS_REGION=us-east-1
-INTERNAL_SCHEDULER_ENABLED=false
+INTERNAL_SCHEDULER_ENABLED=true
 SCAN_LOCK_TIMEOUT_MINUTES=45
+DEMO_MODE=true
 ```
 
-Add live credentials when ready:
+Then deploy.
+
+### Railway Start Command
+
+The production start command is:
+
+```bash
+prisma migrate deploy && node dist/src/server.js
+```
+
+The repo already exposes that through:
+
+```bash
+npm run railway:start
+```
+
+### Background Scanning On Railway
+
+For the SQLite MVP, keep background scanning inside the main service:
+
+```env
+INTERNAL_SCHEDULER_ENABLED=true
+```
+
+That keeps the scheduler and the SQLite file in the same service and volume.
+
+The repo also includes a one-shot due-scan runner:
+
+```bash
+npm run scan:due
+npm run scan:due:build
+npm run railway:scan-due
+```
+
+Use that runner when:
+
+- you are running scans manually
+- you are moving to a shared database such as Postgres
+- you later split scanning into a dedicated scheduled service
+
+For a separate Railway cron service, a shared database is the safer next step than trying to coordinate multiple services around one local SQLite file.
+
+### Add Live Credentials Later
+
+Once the UI is deployed, add:
 
 ```env
 EBAY_CLIENT_ID=...
@@ -297,90 +416,31 @@ AMAZON_SPAPI_REFRESH_TOKEN=...
 AMAZON_SPAPI_AWS_ACCESS_KEY_ID=...
 AMAZON_SPAPI_AWS_SECRET_ACCESS_KEY=...
 AMAZON_SPAPI_AWS_REGION=us-east-1
+DEMO_MODE=false
 ```
-
-4. Railway uses `railway.json`:
-
-- build command: `npm install && npm run build`
-- start command: `npm run railway:start`
-
-5. `npm run railway:start` runs:
-
-```bash
-prisma migrate deploy && node dist/src/server.js
-```
-
-That ensures the bundled migrations are applied before the app starts.
-
-### Reliable Background Scanning on Railway
-
-The app now includes a one-shot due-scan worker designed for Railway Cron or a dedicated worker service.
-
-Commands:
-
-```bash
-npm run scan:due
-npm run scan:due:build
-npm run railway:scan-due
-```
-
-The production worker command is:
-
-```bash
-prisma migrate deploy && node dist/src/jobs/runDueScans.js
-```
-
-Recommended Railway pattern:
-
-1. Keep the main web service running with `INTERNAL_SCHEDULER_ENABLED=false`.
-2. Create a second scheduled Railway service or cron job from the same repo.
-3. Give it the same environment variables and the same mounted `/data` volume path.
-4. Set its start or cron command to `npm run railway:scan-due`.
-5. Choose the schedule you want, such as every 5 or 15 minutes.
-
-Why this is safer:
-
-- scans are persisted in SQLite on the Railway volume
-- a database-backed scan lease prevents overlapping runs across multiple Railway processes
-- the worker exits after each sweep, which is a better fit for scheduled execution than relying only on an always-on web process
-
-### Fast Preview Option
-
-If you only want to preview the UI on Railway first, set:
-
-```env
-DEMO_MODE=true
-```
-
-and omit all API credentials.
 
 ## eBay Credentials
 
-To enable live eBay Canada Browse API searches:
+To enable live eBay Canada search:
 
-1. Create an account at [developer.ebay.com](https://developer.ebay.com/).
-2. Create an application and obtain:
+1. Create an app at [developer.ebay.com](https://developer.ebay.com/)
+2. Use the production keyset
+3. Set:
    - `EBAY_CLIENT_ID`
    - `EBAY_CLIENT_SECRET`
-3. Use `production` keys for real marketplace searches.
-4. Set:
    - `EBAY_ENVIRONMENT=production`
 
-The app uses the official Buy Browse API with Canada-focused assumptions:
+The app uses official eBay APIs only.
 
-- `X-EBAY-C-MARKETPLACE-ID: EBAY_CA`
-- Canada location filtering
-- fixed-price bias by default
+### eBay Account Deletion Notification
 
-### eBay Marketplace Account Deletion Notification
-
-eBay production apps may require a deletion notification endpoint. This app exposes:
+Production eBay apps may require a deletion notification endpoint. This app exposes:
 
 ```text
 https://your-app.up.railway.app/webhooks/ebay/account-deletion
 ```
 
-Use the same value for Railway and eBay:
+Set the same verification token in both places:
 
 ```env
 EBAY_NOTIFICATION_VERIFICATION_TOKEN=your_32_to_80_character_token
@@ -388,39 +448,40 @@ EBAY_NOTIFICATION_VERIFICATION_TOKEN=your_32_to_80_character_token
 
 ## Amazon SP-API Credentials
 
-To enable live Amazon.ca matching, pricing, and fee estimates:
+To enable live Amazon.ca destination matching and pricing:
 
-1. Enroll as an Amazon SP-API developer.
-2. Create or use an SP-API application.
-3. Obtain:
+1. Create or use an Amazon SP-API application
+2. Obtain:
    - `AMAZON_SPAPI_CLIENT_ID`
    - `AMAZON_SPAPI_CLIENT_SECRET`
    - `AMAZON_SPAPI_REFRESH_TOKEN`
-4. Create AWS IAM credentials for signing:
+3. Create AWS signing credentials:
    - `AMAZON_SPAPI_AWS_ACCESS_KEY_ID`
    - `AMAZON_SPAPI_AWS_SECRET_ACCESS_KEY`
    - `AMAZON_SPAPI_AWS_REGION`
-5. Keep `AMAZON_MARKETPLACE_ID=A2EUQ1WTGCTBG2` unless you intentionally target a different marketplace.
+4. Keep:
 
-The current live integration path is:
+```env
+AMAZON_MARKETPLACE_ID=A2EUQ1WTGCTBG2
+```
 
-- Catalog search by identifier
-- Catalog search by keywords fallback
-- Product pricing lookup
-- FBA fee estimate lookup
+Live Amazon usage in this build includes:
 
-## Validation and Safety Notes
-
-- Forms use Zod validation before persistence.
-- Hidden CSRF token fields are used for POST forms.
-- Inputs are sanitized before being written.
-- Outbound API requests use timeouts, retry/backoff, and file caching.
-- Failures are logged to `ApiLog` and surfaced in the UI instead of crashing the entire scan.
-- Background scans use a database-backed lease so the same saved search is not processed twice at the same time.
+- catalog search by identifier
+- keyword fallback search
+- pricing lookup
+- fee estimate lookup
+- Amazon source listing generation for `Amazon -> eBay` profiles
 
 ## Testing
 
-Included unit tests cover:
+Run all tests:
+
+```bash
+npm test
+```
+
+Current unit coverage includes:
 
 - title normalization
 - pack count extraction
@@ -428,45 +489,42 @@ Included unit tests cover:
 - profit calculation
 - risk scoring
 
-Run:
-
-```bash
-npm test
-```
-
-## Reasonable MVP Assumptions
-
-These were intentionally chosen to keep the app stable and deployable:
-
-- Single-user MVP with a `User` model already in place for future auth expansion
-- Sales tax, when enabled, is folded into `otherCostEstimate`
-- Saved-search background scanning can run either in-process or from a dedicated Railway worker
-- Secrets are environment-only and displayed as status, not editable values, in the settings UI
-- Demo fixtures are intentionally small and curated rather than trying to simulate the full live marketplaces
-- Amazon price estimation prefers featured/landed offer price when present
-
-## Known Limitations
-
-- No Amazon shipment creation yet
-- No purchasing automation
-- No scraping or browser automation
-- No image similarity matching yet, only a placeholder risk flag
-- Restriction/gating checks are rule-based placeholders, not full account-level eligibility checks
-- Duplicate suppression is basic and keyed primarily by saved search + eBay listing
-- SQLite on Railway requires a mounted volume
-- Live Amazon SP-API responses vary by catalog shape, so some edge-case catalog attributes may need extra normalization later
-
 ## Helpful Commands
 
 ```bash
 npm run dev
 npm run build
 npm start
-npm run scan:due
-npm run scan:due:build
-npm run railway:scan-due
-npm test
 npm run db:seed
+npm test
 npx prisma generate
 npx prisma migrate deploy
 ```
+
+Optional scan commands:
+
+```bash
+npm run scan:due
+npm run scan:due:build
+npm run railway:scan-due
+```
+
+## Assumptions
+
+- Single-user MVP
+- Canada marketplaces only
+- Amazon remains defaulted to `A2EUQ1WTGCTBG2`
+- `Amazon -> eBay` currently uses active listing comps, not confirmed sold comps
+- eBay fee assumptions for `Amazon -> eBay` are configurable in settings
+- Legacy one-way tables remain in the schema during the transition
+
+## Known Limitations
+
+- No purchase automation
+- No shipment creation
+- No marketplace-wide sold-comps ingestion yet
+- No browser automation or scraping
+- No multi-user auth
+- eBay sold-history data is not broadly available through this MVP
+- `Amazon -> eBay` pricing confidence is lower than `eBay -> Amazon` because it relies on active comps rather than official sold-history access
+- SQLite is correct for the MVP, but Postgres is the next step for multi-service workers and heavier analytics

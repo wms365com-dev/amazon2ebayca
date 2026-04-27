@@ -75,8 +75,9 @@ export class EbayService {
     const settings = await getAppSettings();
     const safeMode = settings.rateLimitSafeMode;
     const limit = Math.min(params.limit ?? (safeMode ? 10 : 25), safeMode ? 10 : 25);
+    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
 
-    if (!env.hasEbayCredentials || settings.demoModeOverride || env.demoModeRequested) {
+    if (explicitDemoMode) {
       const demoListings = await loadDemoEbayListings();
       const filtered = this.filterListings(demoListings, params).slice(0, limit);
 
@@ -92,6 +93,10 @@ export class EbayService {
       });
 
       return filtered;
+    }
+
+    if (!env.hasEbayCredentials) {
+      throw new Error("eBay credentials are missing. Configure eBay credentials or enable demo mode explicitly.");
     }
 
     const cacheKey = `ebay:${JSON.stringify(params)}`;

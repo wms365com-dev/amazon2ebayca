@@ -1,23 +1,30 @@
-import { OpportunityStatus } from "@prisma/client";
+import { Marketplace, OpportunityStatus } from "@prisma/client";
 import { z } from "zod";
 
-export const savedSearchSchema = z.object({
-  name: z.string().min(2).max(120),
-  keywords: z.string().min(2).max(250),
-  categoryId: z.string().max(50).optional().or(z.literal("")),
-  includeBrands: z.array(z.string()).default([]),
-  excludeBrands: z.array(z.string()).default([]),
-  minPrice: z.number().nonnegative().nullable(),
-  maxPrice: z.number().nonnegative().nullable(),
-  conditionFilter: z.string().max(50).optional().or(z.literal("")),
-  buyItNowOnly: z.boolean().default(true),
-  allowAuctions: z.boolean().default(false),
-  maxShipping: z.number().nonnegative().nullable(),
-  minROI: z.number().nullable(),
-  minProfit: z.number().nullable(),
-  scanFrequencyMinutes: z.number().int().min(5).max(1440),
-  isActive: z.boolean().default(true)
-});
+export const savedSearchSchema = z
+  .object({
+    name: z.string().min(2).max(120),
+    sourceMarketplace: z.nativeEnum(Marketplace),
+    destinationMarketplace: z.nativeEnum(Marketplace),
+    keywords: z.string().min(2).max(250),
+    categoryId: z.string().max(50).optional().or(z.literal("")),
+    includeBrands: z.array(z.string()).default([]),
+    excludeBrands: z.array(z.string()).default([]),
+    minPrice: z.number().nonnegative().nullable(),
+    maxPrice: z.number().nonnegative().nullable(),
+    conditionFilter: z.string().max(50).optional().or(z.literal("")),
+    buyItNowOnly: z.boolean().default(true),
+    allowAuctions: z.boolean().default(false),
+    maxShipping: z.number().nonnegative().nullable(),
+    minROI: z.number().nullable(),
+    minProfit: z.number().nullable(),
+    scanFrequencyMinutes: z.number().int().min(5).max(1440),
+    isActive: z.boolean().default(true)
+  })
+  .refine((input) => input.sourceMarketplace !== input.destinationMarketplace, {
+    message: "Source and destination marketplaces must be different.",
+    path: ["destinationMarketplace"]
+  });
 
 export const settingsSchema = z.object({
   amazonMarketplaceId: z.string().min(3),
@@ -25,6 +32,9 @@ export const settingsSchema = z.object({
   defaultPrepCost: z.number().nonnegative(),
   defaultLabelCost: z.number().nonnegative(),
   defaultOtherCost: z.number().nonnegative(),
+  defaultOutboundShippingCost: z.number().nonnegative(),
+  defaultEbayFinalValueFeePercent: z.number().min(0).max(1),
+  defaultEbayFixedFee: z.number().nonnegative(),
   applySalesTax: z.boolean(),
   salesTaxRate: z.number().min(0).max(1),
   schedulerEnabled: z.boolean(),

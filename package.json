@@ -1,7 +1,7 @@
 {
   "name": "ebay-canada-to-amazon-ca-fba-analyzer",
   "version": "1.0.0",
-  "description": "Production-quality MVP for analyzing eBay Canada listings against Amazon.ca FBA opportunities.",
+  "description": "Marketplace arbitrage analyzer for sourcing between Amazon.ca and eBay.ca with historical persistence.",
   "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
