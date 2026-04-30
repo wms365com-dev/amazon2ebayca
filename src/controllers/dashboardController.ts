@@ -7,6 +7,7 @@ export async function renderDashboard(req: Request, res: Response) {
   const [
     settings,
     totalActiveSearches,
+    totalTrackedReplens,
     totalOpportunities,
     profitableOpportunities,
     watchedItems,
@@ -17,6 +18,7 @@ export async function renderDashboard(req: Request, res: Response) {
   ] = await Promise.all([
     getAppSettings(),
     prisma.savedSearch.count({ where: { isActive: true } }),
+    prisma.monitoredProduct.count(),
     prisma.arbitrageOpportunity.count(),
     prisma.arbitrageOpportunity.count({ where: { netProfit: { gt: 0 } } }),
     prisma.arbitrageOpportunity.count({ where: { status: "WATCH" } }),
@@ -50,6 +52,7 @@ export async function renderDashboard(req: Request, res: Response) {
     settings,
     metrics: {
       totalActiveSearches,
+      totalTrackedReplens,
       totalOpportunities,
       profitableOpportunities,
       watchedItems,

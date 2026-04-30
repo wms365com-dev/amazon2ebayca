@@ -13,7 +13,7 @@ It also stores historical scan data in the database so opportunities can be resc
 
 The app supports this workflow:
 
-1. Create a `Scan Profile`
+1. Create a `Scan Profile` from scratch or from a built-in suggested template
 2. Choose a source marketplace and destination marketplace
 3. Search the source marketplace for listings
 4. Normalize and store source listings locally
@@ -34,6 +34,8 @@ The app supports this workflow:
 - Rescan history is stored in `ArbitrageOpportunitySnapshot`
 - API cache entries are stored in SQLite instead of JSON cache files
 - Demo mode is now explicit instead of silently turning on when credentials are missing
+- Built-in suggested search templates are included for best sellers, replenishable items, and faster-moving branded products
+- Replen monitoring is built in with bulk ASIN import, target buy prices, and exact-ASIN tracking
 
 ## Stack
 
@@ -71,10 +73,16 @@ The app supports this workflow:
 |   |   |   `-- migration.sql
 |   |   |-- 202604120001_scan_leases
 |   |   |   `-- migration.sql
-|   |   `-- 202604260001_marketplace_arbitrage_rebuild
+|   |   |-- 202604260001_marketplace_arbitrage_rebuild
+|   |   |   `-- migration.sql
+|   |   `-- 202604270001_replen_monitoring
 |   |       `-- migration.sql
 |   |-- schema.prisma
 |   `-- seed.ts
+|-- docs
+|   `-- research
+|       |-- replen-catcher-build-checklist.md
+|       `-- replen-catcher-promises.md
 |-- src
 |   |-- app.ts
 |   |-- server.ts
@@ -85,6 +93,7 @@ The app supports this workflow:
 |   |   |-- adminController.ts
 |   |   |-- dashboardController.ts
 |   |   |-- opportunityController.ts
+|   |   |-- replenController.ts
 |   |   |-- savedSearchController.ts
 |   |   |-- settingsController.ts
 |   |   `-- webhookController.ts
@@ -124,6 +133,8 @@ The app supports this workflow:
 |   |   |-- apiLogService.ts
 |   |   |-- opportunityScanner.ts
 |   |   |-- opportunityService.ts
+|   |   |-- replenMonitorService.ts
+|   |   |-- searchTemplates.ts
 |   |   `-- settingsService.ts
 |   |-- types
 |   |   `-- domain.ts
@@ -149,6 +160,9 @@ The app supports this workflow:
 |       |   |-- footer.ejs
 |       |   |-- head.ejs
 |       |   `-- header.ejs
+|       |-- replens
+|       |   |-- form.ejs
+|       |   `-- index.ejs
 |       |-- searches
 |       |   |-- form.ejs
 |       |   `-- index.ejs
@@ -171,6 +185,8 @@ Core tables in the rebuilt model:
 
 - `SavedSearch`
   This now behaves as a scan profile and stores the source and destination marketplace direction.
+- `MonitoredProduct`
+  Stores exact Amazon ASIN monitoring records, target buy prices, and the linked internal scan profile used for replenishment tracking.
 - `MarketplaceListing`
   Stores normalized source or destination listings from either marketplace.
 - `ListingSnapshot`
@@ -318,6 +334,51 @@ Current destination estimation behavior:
 - `eBay -> Amazon` uses Amazon catalog, pricing, and fee estimates
 - `Amazon -> eBay` uses active eBay listing comps and configurable eBay fee assumptions
 
+## Suggested Search Templates
+
+The app ships with built-in suggested scan-profile templates to help you start faster.
+
+Current templates include examples such as:
+
+- Nintendo controller flips
+- Brother toner replenishment
+- Sealed LEGO set scans
+- Logitech office gear
+- KitchenAid attachment flips
+- YETI drinkware checks
+
+These templates are curated starting points, not guaranteed winners. They are meant to mirror the manual sourcing patterns sellers often use:
+
+- best-selling branded accessories
+- replenishable consumables
+- giftable lifestyle products
+- products with cleaner brand/model matching
+
+The app also seeds a small starter set of these templates on first boot if no scan profiles exist yet.
+
+## Replen Monitor
+
+The app now includes a dedicated replenishment workflow.
+
+You can:
+
+- paste one or more ASINs into the `Replens` page
+- create exact-ASIN monitored items
+- set a target buy price
+- tune max shipping, minimum ROI, minimum profit, and scan frequency
+- pause or resume a monitored ASIN
+- run a manual scan for a monitored ASIN
+- review the best profitable hit found for that ASIN
+
+Under the hood, each monitored replen item owns a linked internal scan profile so it can reuse the same history, scheduler, and opportunity engine already used elsewhere in the app.
+
+This is the first step toward a Replen Catcher style workflow:
+
+- bulk ASIN import
+- exact item monitoring
+- persistent opportunity history
+- replenishment-first sourcing
+
 ## Data Persistence
 
 This rebuild is designed to keep history in the database.
@@ -325,6 +386,7 @@ This rebuild is designed to keep history in the database.
 Persisted records include:
 
 - scan profiles
+- monitored replen items
 - source and destination listings
 - listing snapshots
 - match evidence
@@ -517,6 +579,7 @@ npm run railway:scan-due
 - `Amazon -> eBay` currently uses active listing comps, not confirmed sold comps
 - eBay fee assumptions for `Amazon -> eBay` are configurable in settings
 - Legacy one-way tables remain in the schema during the transition
+- Suggested templates are curated heuristics, not live best-seller rankings from a marketplace API
 
 ## Known Limitations
 

@@ -10,6 +10,47 @@
     </div>
   </section>
 
+  <% if (formMode === 'create') { %>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Suggested Templates</h2>
+          <p class="muted">Use a starting pattern for best sellers, replenishable products, or faster-moving branded items.</p>
+        </div>
+      </div>
+      <% if (selectedTemplate) { %>
+        <div class="template-highlight">
+          <span class="badge active-badge">Template loaded</span>
+          <strong><%= selectedTemplate.draft.name %></strong>
+          <p class="muted"><%= selectedTemplate.summary %></p>
+        </div>
+      <% } %>
+      <div class="template-grid">
+        <% suggestedTemplates.forEach((template) => { %>
+          <article class="template-card <%= selectedTemplate?.slug === template.slug ? 'template-card-selected' : '' %>">
+            <div class="template-topline">
+              <span class="badge"><%= template.strategy %></span>
+              <span class="badge"><%= template.draft.sourceMarketplace %> -> <%= template.draft.destinationMarketplace %></span>
+            </div>
+            <h3><%= template.draft.name %></h3>
+            <p><%= template.summary %></p>
+            <p class="muted"><strong>Why this works:</strong> <%= template.rationale %></p>
+            <div class="tag-list">
+              <% template.watchouts.forEach((item) => { %>
+                <span class="tag warning"><%= item %></span>
+              <% }) %>
+            </div>
+            <div class="template-actions">
+              <a href="/searches/new?template=<%= template.slug %>" class="button secondary small">
+                <%= selectedTemplate?.slug === template.slug ? 'Loaded' : 'Load template' %>
+              </a>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
   <section class="panel">
     <form method="post" action="<%= formMode === 'create' ? '/searches' : `/searches/${search.id}/update` %>" class="form-grid">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>" />

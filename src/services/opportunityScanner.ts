@@ -520,10 +520,166 @@ function median(values: number[]) {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
-async function findAmazonDestinationMatch(
+async function findMonitoredAmazonDestinationMatch(
   sourceListing: NormalizedMarketplaceListing,
+  monitoredProduct: {
+    id: number;
+    asin: string;
+    amazonMarketplaceId: string;
+    title: string;
+    brand: string | null;
+    model: string | null;
+    imageUrl: string | null;
+    packageQuantity: number | null;
+  },
   settings: Awaited<ReturnType<typeof getAppSettings>>
 ): Promise<ListingMatchEvidence> {
+  const candidate =
+    (await amazonService.getCatalogItemByAsin(monitoredProduct.asin, monitoredProduct.amazonMarketplaceId)) ?? {
+      asin: monitoredProduct.asin,
+      title: monitoredProduct.title,
+      brand: monitoredProduct.brand,
+      model: monitoredProduct.model,
+      packageQuantity: monitoredProduct.packageQuantity,
+      imageUrl: monitoredProduct.imageUrl,
+      sizeColorVariant: null,
+      identifiers: [],
+      rawCatalogJson: null
+    };
+
+  const pricing = await amazonService.getPricingForAsin(monitoredProduct.asin, monitoredProduct.amazonMarketplaceId);
+  const destinationPrice =
+    pricing.featuredOfferPrice ?? pricing.amazonPrice ?? candidate.featuredOfferPrice ?? candidate.amazonPrice ?? 0;
+  const feeEstimateResult = destinationPrice
+    ? await amazonService.getFeeEstimateForAsin(monitoredProduct.asin, destinationPrice, monitoredProduct.amazonMarketplaceId)
+    : { feeEstimate: null, fulfillmentFee: null, referralFee: null, rawFeesJson: null };
+  const destinationListing = mapAmazonCandidateToListing(
+    monitoredProduct.asin,
+    candidate.title,
+    destinationPrice,
+    candidate.imageUrl ?? monitoredProduct.imageUrl ?? null,
+    candidate.brand ?? monitoredProduct.brand ?? null,
+    candidate.model ?? monitoredProduct.model ?? null,
+    candidate.identifiers,
+    candidate.packageQuantity ?? monitoredProduct.packageQuantity ?? null,
+    candidate.sizeColorVariant ?? null,
+    {
+      catalog: candidate.rawCatalogJson,
+      pricing: pricing.rawPricingJson,
+      fees: feeEstimateResult.rawFeesJson
+    }
+  );
+
+  const sourceBrand = extractBrand(sourceListing.title, sourceListing.brand);
+  const targetBrand = extractBrand(destinationListing.title, destinationListing.brand);
+  const sourceModel = extractModel(sourceListing.title, sourceListing.mpn);
+  const targetModel = extractModel(destinationListing.title, destinationListing.mpn);
+  const sourcePack = sourceListing.packageQuantity ?? extractPackCount(sourceListing.title);
+  const targetPack = destinationListing.packageQuantity ?? extractPackCount(destinationListing.title);
+  const titleSimilarity = computeTitleSimilarity(sourceListing.title, destinationListing.title);
+  const variantComparison = compareVariants(sourceListing.title, destinationListing.title);
+  const identifierMatch = Boolean(
+    candidate.identifiers?.some((identifier: string) => identifier === sourceListing.upc || identifier === sourceListing.gtin)
+  );
+  const brandMatch = Boolean(sourceBrand && targetBrand && sourceBrand === targetBrand);
+  const modelMatch = Boolean(sourceModel && targetModel && sourceModel === targetModel);
+  const packCountMatch = sourcePack && targetPack ? sourcePack === targetPack : sourcePack || targetPack ? false : null;
+  const conditionCompatible = !String(sourceListing.condition ?? "").toLowerCase().includes("parts");
+  const confidence = computeMatchConfidence({
+    identifierMatch,
+    brandMatch,
+    modelMatch,
+    titleSimilarity,
+    packCountMatch,
+    variantMatch: variantComparison.match,
+    conditionCompatible
+  });
+  const reasons = ["Matched against a monitored ASIN from your replens list"];
+  const warnings: string[] = [];
+
+  if (identifierMatch) {
+    reasons.push("Source identifier aligns with monitored Amazon item");
+  }
+  if (brandMatch) {
+    reasons.push("Brand aligned");
+  }
+  if (modelMatch) {
+    reasons.push("Model aligned");
+  }
+  if (titleSimilarity > 0.55) {
+    reasons.push(`Title similarity ${(titleSimilarity * 100).toFixed(0)}%`);
+  } else if (titleSimilarity < 0.3) {
+    warnings.push("Low title overlap");
+  }
+  if (packCountMatch === false) {
+    warnings.push("Pack count differs");
+  }
+  if (variantComparison.match === false) {
+    warnings.push(variantComparison.note ?? "Variant terms differ");
+  }
+  if (!conditionCompatible) {
+    warnings.push("Condition may not be suitable for Amazon resale");
+  }
+
+  await prisma.monitoredProduct.update({
+    where: { id: monitoredProduct.id },
+    data: {
+      title: candidate.title,
+      brand: candidate.brand ?? monitoredProduct.brand,
+      model: candidate.model ?? monitoredProduct.model,
+      imageUrl: candidate.imageUrl ?? monitoredProduct.imageUrl,
+      packageQuantity: candidate.packageQuantity ?? monitoredProduct.packageQuantity,
+      lastAmazonPrice: destinationPrice || null,
+      lastAmazonFeeEstimate: feeEstimateResult.feeEstimate ?? null,
+      lastAmazonSyncAt: new Date()
+    }
+  });
+
+  if (confidence < 35) {
+    return {
+      destination: null,
+      confidence,
+      method: MatchMethod.MANUAL,
+      reasons: [],
+      warnings: [...warnings, "Monitored ASIN exists, but the eBay listing does not confidently match it"],
+      destinationPrice: 0,
+      destinationFeeEstimate: 0,
+      destinationShippingCredit: 0,
+      fulfillmentCostEstimate: settings.defaultInboundCost
+    };
+  }
+
+  return {
+    destination: destinationListing,
+    confidence,
+    method: identifierMatch ? MatchMethod.UPC : MatchMethod.MANUAL,
+    reasons,
+    warnings,
+    destinationPrice,
+    destinationFeeEstimate: feeEstimateResult.feeEstimate ?? 0,
+    destinationShippingCredit: 0,
+    fulfillmentCostEstimate: settings.defaultInboundCost
+  };
+}
+
+async function findAmazonDestinationMatch(
+  sourceListing: NormalizedMarketplaceListing,
+  settings: Awaited<ReturnType<typeof getAppSettings>>,
+  monitoredProduct?: {
+    id: number;
+    asin: string;
+    amazonMarketplaceId: string;
+    title: string;
+    brand: string | null;
+    model: string | null;
+    imageUrl: string | null;
+    packageQuantity: number | null;
+  } | null
+): Promise<ListingMatchEvidence> {
+  if (monitoredProduct) {
+    return findMonitoredAmazonDestinationMatch(sourceListing, monitoredProduct, settings);
+  }
+
   const legacySource: NormalizedEbayListing = {
     ebayItemId: sourceListing.externalListingId,
     title: sourceListing.title,
@@ -666,6 +822,16 @@ async function persistOpportunityForListing(
     minProfit: number | null;
     destinationMarketplace: Marketplace;
     sourceMarketplace: Marketplace;
+    monitoredProduct?: {
+      id: number;
+      asin: string;
+      amazonMarketplaceId: string;
+      title: string;
+      brand: string | null;
+      model: string | null;
+      imageUrl: string | null;
+      packageQuantity: number | null;
+    } | null;
   },
   scanJobId: number,
   sourceListing: NormalizedMarketplaceListing
@@ -681,7 +847,7 @@ async function persistOpportunityForListing(
 
   const matchEvidence =
     savedSearch.destinationMarketplace === Marketplace.AMAZON_CA
-      ? await findAmazonDestinationMatch(sourceListing, settings)
+      ? await findAmazonDestinationMatch(sourceListing, settings, savedSearch.monitoredProduct)
       : await findEbayDestinationMatch(sourceListing, settings, {
           scanJobId,
           savedSearchId: savedSearch.id
@@ -838,7 +1004,10 @@ async function persistOpportunityForListing(
 export async function scanSavedSearch(savedSearchId: number, triggeredBy = "manual") {
   return withScanLease(savedSearchId, async (lease) => {
     const savedSearch = await prisma.savedSearch.findUniqueOrThrow({
-      where: { id: savedSearchId }
+      where: { id: savedSearchId },
+      include: {
+        monitoredProduct: true
+      }
     });
     const settings = await getAppSettings();
 
@@ -928,7 +1097,19 @@ export async function rescanOpportunity(opportunityId: number) {
           id: true,
           minProfit: true,
           sourceMarketplace: true,
-          destinationMarketplace: true
+          destinationMarketplace: true,
+          monitoredProduct: {
+            select: {
+              id: true,
+              asin: true,
+              amazonMarketplaceId: true,
+              title: true,
+              brand: true,
+              model: true,
+              imageUrl: true,
+              packageQuantity: true
+            }
+          }
         }
       }
     }

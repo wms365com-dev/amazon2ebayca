@@ -50,3 +50,26 @@ export const opportunityStatusSchema = z.object({
 export const opportunityNoteSchema = z.object({
   notes: z.string().max(4000).optional()
 });
+
+export const monitoredImportSchema = z.object({
+  asinsText: z.string().min(3).max(10000),
+  targetBuyPrice: z.number().nonnegative().nullable(),
+  maxShipping: z.number().nonnegative().nullable(),
+  minROI: z.number().nullable(),
+  minProfit: z.number().nullable(),
+  scanFrequencyMinutes: z.number().int().min(5).max(1440),
+  isActive: z.boolean().default(true),
+  notes: z.string().max(2000).optional().or(z.literal(""))
+});
+
+export const monitoredProductUpdateSchema = z.object({
+  sourceKeywords: z.string().min(2).max(250),
+  targetBuyPrice: z.number().nonnegative().nullable(),
+  maxShipping: z.number().nonnegative().nullable(),
+  minROI: z.number().nullable(),
+  minProfit: z.number().nullable(),
+  scanFrequencyMinutes: z.number().int().min(5).max(1440),
+  conditionFilter: z.string().max(50).optional().or(z.literal("")),
+  isActive: z.boolean().default(true),
+  notes: z.string().max(2000).optional().or(z.literal(""))
+});

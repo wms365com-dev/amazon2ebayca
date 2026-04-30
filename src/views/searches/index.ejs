@@ -14,6 +14,40 @@
   </section>
 
   <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Suggested Search Ideas</h2>
+        <p class="muted">Start with proven product patterns like best sellers, replenishable consumables, and faster-moving branded accessories.</p>
+      </div>
+      <a href="/searches/new" class="text-link">Build from scratch</a>
+    </div>
+    <div class="template-grid">
+      <% suggestedTemplates.forEach((template) => { %>
+        <article class="template-card">
+          <div class="template-topline">
+            <span class="badge"><%= template.strategy %></span>
+            <span class="badge"><%= template.draft.sourceMarketplace %> -> <%= template.draft.destinationMarketplace %></span>
+          </div>
+          <h3><%= template.draft.name %></h3>
+          <p><%= template.summary %></p>
+          <p class="muted"><strong>Why this works:</strong> <%= template.rationale %></p>
+          <div class="tag-list">
+            <% template.watchouts.forEach((item) => { %>
+              <span class="tag warning"><%= item %></span>
+            <% }) %>
+          </div>
+          <div class="template-metrics muted">
+            Keywords: <%= template.draft.keywords %>
+          </div>
+          <div class="template-actions">
+            <a href="/searches/new?template=<%= template.slug %>" class="button secondary small">Use template</a>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="panel">
     <div class="table-scroll">
       <table>
         <thead>

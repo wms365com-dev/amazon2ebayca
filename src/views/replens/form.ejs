@@ -1,0 +1,86 @@
+<%- include("../partials/head") %>
+<%- include("../partials/header") %>
+<%- include("../partials/flash") %>
+
+<main class="shell page-shell narrow">
+  <section class="page-intro">
+    <div>
+      <h1>Edit Replen Monitor</h1>
+      <p>Tune the exact ASIN monitor by adjusting target buy price, filters, and scan frequency.</p>
+    </div>
+    <div class="intro-actions">
+      <a href="/replens" class="button secondary">Back to replens</a>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="detail-card">
+      <% if (monitoredProduct.imageUrl) { %>
+        <img src="<%= monitoredProduct.imageUrl %>" alt="Monitored Amazon item" class="detail-image" />
+      <% } %>
+      <div class="detail-copy">
+        <strong><%= monitoredProduct.title %></strong>
+        <p class="muted">ASIN: <code><%= monitoredProduct.asin %></code></p>
+        <p class="muted">Brand: <%= monitoredProduct.brand ?? 'Unknown' %></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <form method="post" action="/replens/<%= monitoredProduct.id %>/update" class="form-grid">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+
+      <label class="span-two">
+        <span>Source keywords</span>
+        <input type="text" name="sourceKeywords" required value="<%= monitoredProduct.sourceKeywords %>" />
+      </label>
+
+      <label>
+        <span>Target buy price</span>
+        <input type="number" step="0.01" name="targetBuyPrice" value="<%= monitoredProduct.targetBuyPrice ?? '' %>" />
+      </label>
+
+      <label>
+        <span>Max shipping cost</span>
+        <input type="number" step="0.01" name="maxShipping" value="<%= monitoredProduct.savedSearch.maxShipping ?? '' %>" />
+      </label>
+
+      <label>
+        <span>Min ROI %</span>
+        <input type="number" step="0.01" name="minROI" value="<%= monitoredProduct.savedSearch.minROI ?? '' %>" />
+      </label>
+
+      <label>
+        <span>Min profit</span>
+        <input type="number" step="0.01" name="minProfit" value="<%= monitoredProduct.savedSearch.minProfit ?? '' %>" />
+      </label>
+
+      <label>
+        <span>Condition filter</span>
+        <input type="text" name="conditionFilter" value="<%= monitoredProduct.savedSearch.conditionFilter ?? '' %>" placeholder="NEW" />
+      </label>
+
+      <label>
+        <span>Scan frequency (minutes)</span>
+        <input type="number" min="5" max="1440" name="scanFrequencyMinutes" value="<%= monitoredProduct.savedSearch.scanFrequencyMinutes %>" />
+      </label>
+
+      <label class="toggle">
+        <input type="checkbox" name="isActive" <%= monitoredProduct.savedSearch.isActive ? 'checked' : '' %> />
+        <span>Monitor actively</span>
+      </label>
+
+      <label class="span-two">
+        <span>Notes</span>
+        <textarea name="notes" rows="5" placeholder="Notes about gating, target seasonality, or preferred source conditions."><%= monitoredProduct.notes ?? '' %></textarea>
+      </label>
+
+      <div class="form-actions">
+        <button type="submit" class="button">Save changes</button>
+        <a href="/opportunities?sourceSearchId=<%= monitoredProduct.savedSearchId %>" class="button secondary">View opportunities</a>
+      </div>
+    </form>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

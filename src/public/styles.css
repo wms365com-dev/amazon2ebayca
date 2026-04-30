@@ -361,6 +361,58 @@ th {
   gap: 0.8rem;
 }
 
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff, #f7faf5);
+}
+
+.template-card h3 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.template-card p {
+  margin: 0;
+}
+
+.template-card-selected {
+  border-color: rgba(31, 111, 67, 0.45);
+  box-shadow: 0 0 0 2px rgba(31, 111, 67, 0.12);
+}
+
+.template-topline,
+.template-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.template-metrics {
+  font-size: 0.92rem;
+}
+
+.template-highlight {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #f7fbf6, #eef6f0);
+}
+
 .opportunity-card {
   display: flex;
   justify-content: space-between;
@@ -430,6 +482,10 @@ textarea {
 
 .toggle input {
   width: auto;
+}
+
+.span-two {
+  grid-column: span 2;
 }
 
 .form-actions {
@@ -528,6 +584,12 @@ textarea {
   flex: 1;
 }
 
+.replen-item {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+
 @media (max-width: 860px) {
   .header-shell,
   .page-intro,
@@ -544,5 +606,9 @@ textarea {
   .site-nav a {
     flex: 1 1 auto;
     text-align: center;
+  }
+
+  .span-two {
+    grid-column: auto;
   }
 }

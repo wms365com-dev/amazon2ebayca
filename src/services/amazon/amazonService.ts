@@ -36,6 +36,54 @@ export class AmazonService {
   private readonly baseUrl = "https://sellingpartnerapi-na.amazon.com";
   private readonly serviceName = "execute-api";
 
+  async getCatalogItemByAsin(
+    asin: string,
+    marketplaceId: string,
+    context: RequestContext = {}
+  ): Promise<AmazonCatalogCandidate | null> {
+    const settings = await getAppSettings();
+    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
+    if (explicitDemoMode) {
+      const catalog = await loadDemoAmazonCatalog();
+      return catalog.find((candidate) => candidate.asin === asin) ?? null;
+    }
+    this.assertCredentials();
+
+    const cacheKey = `amazon:catalog:asin:${asin}:${marketplaceId}`;
+    const cached = await readCache<AmazonCatalogCandidate | null>(cacheKey, 15 * 60_000);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await this.signedRequest<Record<string, unknown>>({
+      method: "GET",
+      path: `/catalog/2022-04-01/items/${encodeURIComponent(asin)}`,
+      query: {
+        marketplaceIds: marketplaceId,
+        includedData: "summaries,attributes,images,identifiers"
+      }
+    });
+
+    if (response.status >= 400) {
+      await this.logFailure("getCatalogItemByAsin", asin, response.status, response.data, context);
+      throw new Error(`Amazon catalog ASIN lookup failed with status ${response.status}`);
+    }
+
+    const mapped = this.mapCatalogItem(response.data);
+    await writeCache(cacheKey, mapped);
+    await createApiLog({
+      source: ApiLogSource.AMAZON,
+      operation: "getCatalogItemByAsin",
+      requestKey: asin,
+      statusCode: response.status,
+      detail: { title: mapped.title },
+      scanJobId: context.scanJobId,
+      savedSearchId: context.savedSearchId
+    });
+
+    return mapped;
+  }
+
   async searchSourceListings(
     keywords: string,
     marketplaceId: string,
