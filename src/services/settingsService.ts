@@ -13,8 +13,13 @@ const DEFAULT_SETTING_VALUES: Record<keyof AppSettings, string> = {
   applySalesTax: "false",
   salesTaxRate: "0.13",
   schedulerEnabled: "true",
+  schedulerMinIntervalMinutes: "1440",
   rateLimitSafeMode: "true",
-  demoModeOverride: "false"
+  demoModeOverride: "false",
+  opportunityMinConfidence: "60",
+  opportunityMaxRisk: "55",
+  requireImageVerification: "true",
+  ipComplaintBrands: ""
 };
 
 function parseBoolean(value: string | undefined, fallback = false) {
@@ -28,6 +33,13 @@ function parseBoolean(value: string | undefined, fallback = false) {
 function parseNumber(value: string | undefined, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function parseStringList(value: string | undefined) {
+  return String(value ?? "")
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 export async function ensureDefaultSettings() {
@@ -59,8 +71,13 @@ export async function getAppSettings(): Promise<AppSettings> {
     applySalesTax: parseBoolean(map.applySalesTax),
     salesTaxRate: parseNumber(map.salesTaxRate, 0.13),
     schedulerEnabled: parseBoolean(map.schedulerEnabled, true),
+    schedulerMinIntervalMinutes: parseNumber(map.schedulerMinIntervalMinutes, 1440),
     rateLimitSafeMode: parseBoolean(map.rateLimitSafeMode, true),
-    demoModeOverride: parseBoolean(map.demoModeOverride)
+    demoModeOverride: parseBoolean(map.demoModeOverride),
+    opportunityMinConfidence: parseNumber(map.opportunityMinConfidence, 60),
+    opportunityMaxRisk: parseNumber(map.opportunityMaxRisk, 55),
+    requireImageVerification: parseBoolean(map.requireImageVerification, true),
+    ipComplaintBrands: parseStringList(map.ipComplaintBrands)
   };
 }
 

@@ -4,6 +4,8 @@ import { Request, Response } from "express";
 import { prisma } from "../db/prisma";
 import { opportunityNoteSchema, opportunityStatusSchema } from "../models/validators";
 import { ScanAlreadyRunningError, rescanOpportunity } from "../services/opportunityScanner";
+import { buildQualityOpportunityWhere } from "../services/opportunityQualityService";
+import { getAppSettings } from "../services/settingsService";
 import { saveOpportunityNotes, updateOpportunityStatus } from "../services/opportunityService";
 import { resolvePagination, buildPaginationMeta } from "../utils/pagination";
 import { redirectWithNotice } from "../utils/redirect";
@@ -15,15 +17,27 @@ function parseBooleanQuery(value: unknown) {
 export async function listOpportunities(req: Request, res: Response) {
   const pagination = resolvePagination(req.query, 25);
   const where: Prisma.ArbitrageOpportunityWhereInput = {};
+  const settings = await getAppSettings();
   const minROI = Number(req.query.minROI);
   const minProfit = Number(req.query.minProfit);
   const minConfidence = Number(req.query.minConfidence);
   const maxRisk = Number(req.query.maxRisk);
   const sourceSearchId = Number(req.query.sourceSearchId);
   const sortBy = String(req.query.sortBy ?? "roi");
+  const qualityOnly =
+    req.query.qualityOnly === undefined
+      ? String(req.query.status ?? "") !== OpportunityStatus.REVIEW
+      : parseBooleanQuery(req.query.qualityOnly);
+
+  if (qualityOnly) {
+    Object.assign(where, buildQualityOpportunityWhere(settings));
+  }
 
   if (parseBooleanQuery(req.query.profitableOnly)) {
-    where.netProfit = { gt: 0 };
+    where.netProfit = {
+      ...(typeof where.netProfit === "object" && where.netProfit !== null ? where.netProfit : {}),
+      gt: 0
+    };
   }
   if (Number.isFinite(minROI)) {
     where.roiPercent = { gte: minROI };
@@ -79,7 +93,8 @@ export async function listOpportunities(req: Request, res: Response) {
     opportunities,
     savedSearches,
     pagination: buildPaginationMeta(total, pagination.page, pagination.pageSize),
-    filters: req.query
+    filters: req.query,
+    qualityOnly
   });
 }
 

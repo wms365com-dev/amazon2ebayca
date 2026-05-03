@@ -1,6 +1,7 @@
+import { Marketplace } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
-import { assessRisk } from "../src/services/risk/riskEngine";
+import { assessArbitrageRisk, assessRisk } from "../src/services/risk/riskEngine";
 
 describe("assessRisk", () => {
   it("flags used listings with low seller quality and no barcode as risky", () => {
@@ -34,6 +35,77 @@ describe("assessRisk", () => {
     expect(result.score).toBeGreaterThanOrEqual(60);
     expect(result.flags.map((flag) => flag.code)).toEqual(
       expect.arrayContaining(["NO_BARCODE", "USED_CONDITION", "LOW_SELLER_FEEDBACK", "LOW_PROFIT"])
+    );
+  });
+
+  it("flags complaint-list brands and missing images for review", () => {
+    const result = assessArbitrageRisk({
+      sourceListing: {
+        marketplace: Marketplace.EBAY_CA,
+        externalListingId: "ebay-1",
+        listingKind: "OFFER",
+        title: "LEGO Speed Champions sealed set",
+        subtitle: null,
+        condition: "NEW",
+        buyingOptions: ["FIXED_PRICE"],
+        currentPrice: 29.99,
+        shippingCost: 12,
+        listingUrl: "https://example.com/source",
+        imageUrl: null,
+        sellerName: "seller",
+        sellerFeedbackPercentage: 99,
+        sellerFeedbackScore: 500,
+        gtin: "123456789012",
+        brand: "LEGO",
+        mpn: null,
+        upc: "123456789012",
+        categoryPath: null,
+        locationCountry: "CA",
+        quantityAvailable: 1,
+        packageQuantity: 1,
+        variant: null,
+        listingEndAt: null,
+        rawJson: {}
+      },
+      destinationListing: {
+        marketplace: Marketplace.AMAZON_CA,
+        externalListingId: "B000TEST",
+        listingKind: "CATALOG",
+        title: "LEGO Speed Champions Building Set",
+        subtitle: null,
+        condition: "NEW",
+        buyingOptions: ["CATALOG"],
+        currentPrice: 69.99,
+        shippingCost: 0,
+        listingUrl: "https://example.com/destination",
+        imageUrl: null,
+        sellerName: null,
+        sellerFeedbackPercentage: null,
+        sellerFeedbackScore: null,
+        gtin: "123456789012",
+        brand: "LEGO",
+        mpn: null,
+        upc: "123456789012",
+        categoryPath: null,
+        locationCountry: "CA",
+        quantityAvailable: null,
+        packageQuantity: 1,
+        variant: null,
+        listingEndAt: null,
+        rawJson: {}
+      },
+      destinationMarketplace: Marketplace.AMAZON_CA,
+      matchConfidence: 88,
+      matchWarnings: [],
+      netProfit: 18,
+      marginPercent: 25,
+      minProfitThreshold: 8,
+      ipComplaintBrands: ["LEGO"]
+    });
+
+    expect(result.score).toBeGreaterThanOrEqual(40);
+    expect(result.flags.map((flag) => flag.code)).toEqual(
+      expect.arrayContaining(["IP_COMPLAINT_BRAND", "IMAGE_UNVERIFIED"])
     );
   });
 });

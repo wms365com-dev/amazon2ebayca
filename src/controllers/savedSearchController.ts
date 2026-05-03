@@ -27,7 +27,7 @@ function buildSavedSearchInput(body: Record<string, unknown>) {
     maxShipping: parseCurrencyInput(body.maxShipping),
     minROI: parseCurrencyInput(body.minROI),
     minProfit: parseCurrencyInput(body.minProfit),
-    scanFrequencyMinutes: parseIntegerInput(body.scanFrequencyMinutes, 60),
+    scanFrequencyMinutes: parseIntegerInput(body.scanFrequencyMinutes, 1440),
     isActive: parseCheckbox(body.isActive)
   });
 }

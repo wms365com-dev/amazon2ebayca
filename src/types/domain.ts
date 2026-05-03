@@ -133,6 +133,7 @@ export interface RiskFlag {
     | "VARIANT_MISMATCH"
     | "LOW_MARGIN"
     | "LOW_PROFIT"
+    | "IP_COMPLAINT_BRAND"
     | "POSSIBLE_RESTRICTION"
     | "VOLATILE_PRICING"
     | "IMAGE_UNVERIFIED"
@@ -179,6 +180,11 @@ export interface AppSettings {
   applySalesTax: boolean;
   salesTaxRate: number;
   schedulerEnabled: boolean;
+  schedulerMinIntervalMinutes: number;
   rateLimitSafeMode: boolean;
   demoModeOverride: boolean;
+  opportunityMinConfidence: number;
+  opportunityMaxRisk: number;
+  requireImageVerification: boolean;
+  ipComplaintBrands: string[];
 }

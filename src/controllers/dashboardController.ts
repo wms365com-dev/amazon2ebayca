@@ -1,11 +1,14 @@
 import { Request, Response } from "express";
 
 import { prisma } from "../db/prisma";
+import { buildQualityOpportunityWhere } from "../services/opportunityQualityService";
 import { getAppSettings } from "../services/settingsService";
 
 export async function renderDashboard(req: Request, res: Response) {
+  const settings = await getAppSettings();
+  const qualityWhere = buildQualityOpportunityWhere(settings);
+
   const [
-    settings,
     totalActiveSearches,
     totalTrackedReplens,
     totalOpportunities,
@@ -16,11 +19,10 @@ export async function renderDashboard(req: Request, res: Response) {
     topOpportunities,
     recentErrors
   ] = await Promise.all([
-    getAppSettings(),
     prisma.savedSearch.count({ where: { isActive: true } }),
     prisma.monitoredProduct.count(),
     prisma.arbitrageOpportunity.count(),
-    prisma.arbitrageOpportunity.count({ where: { netProfit: { gt: 0 } } }),
+    prisma.arbitrageOpportunity.count({ where: qualityWhere }),
     prisma.arbitrageOpportunity.count({ where: { status: "WATCH" } }),
     prisma.arbitrageOpportunity.count({ where: { status: "BUY" } }),
     prisma.scanJob.findMany({
@@ -29,6 +31,7 @@ export async function renderDashboard(req: Request, res: Response) {
       include: { savedSearch: true }
     }),
     prisma.arbitrageOpportunity.findMany({
+      where: qualityWhere,
       orderBy: [{ roiPercent: "desc" }, { netProfit: "desc" }],
       take: 10,
       include: {

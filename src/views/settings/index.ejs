@@ -13,13 +13,21 @@
   <section class="status-grid">
     <article class="panel compact">
       <h2>eBay connector</h2>
-      <p><span class="badge <%= envStatus.ebayConfigured ? 'active-badge' : 'inactive-badge' %>"><%= envStatus.ebayConfigured ? 'Configured' : 'Missing' %></span></p>
+      <p class="connector-status-row">
+        <span class="badge <%= envStatus.ebayConfigured ? 'active-badge' : 'inactive-badge' %>"><%= envStatus.ebayConfigured ? 'Configured' : 'Missing' %></span>
+        <span class="badge <%= connectorModes.ebay.badgeClass %>"><%= connectorModes.ebay.label %></span>
+      </p>
       <p class="muted">Environment: <%= envStatus.ebayEnvironment %></p>
+      <p class="muted"><%= connectorModes.ebay.reason %></p>
     </article>
     <article class="panel compact">
       <h2>Amazon connector</h2>
-      <p><span class="badge <%= envStatus.amazonConfigured ? 'active-badge' : 'inactive-badge' %>"><%= envStatus.amazonConfigured ? 'Configured' : 'Missing' %></span></p>
+      <p class="connector-status-row">
+        <span class="badge <%= envStatus.amazonConfigured ? 'active-badge' : 'inactive-badge' %>"><%= envStatus.amazonConfigured ? 'Configured' : 'Missing' %></span>
+        <span class="badge <%= connectorModes.amazon.badgeClass %>"><%= connectorModes.amazon.label %></span>
+      </p>
       <p class="muted">Amazon Canada marketplace is preloaded by default.</p>
+      <p class="muted"><%= connectorModes.amazon.reason %></p>
     </article>
   </section>
 
@@ -82,6 +90,11 @@
         <span>Enable background scanning</span>
       </label>
 
+      <label>
+        <span>Scheduler minimum interval (minutes)</span>
+        <input type="number" min="5" max="1440" name="schedulerMinIntervalMinutes" value="<%= settings.schedulerMinIntervalMinutes %>" />
+      </label>
+
       <label class="toggle">
         <input type="checkbox" name="rateLimitSafeMode" <%= settings.rateLimitSafeMode ? 'checked' : '' %> />
         <span>Rate-limit safe mode</span>
@@ -89,7 +102,37 @@
 
       <label class="toggle">
         <input type="checkbox" name="demoModeOverride" <%= settings.demoModeOverride ? 'checked' : '' %> />
-        <span>Force explicit demo mode</span>
+        <span>Force all connectors into demo mode</span>
+      </label>
+
+      <div class="panel compact span-two">
+        <h3>Connector fallback behavior</h3>
+        <p class="muted">
+          <code>DEMO_MODE=true</code> now acts as connector fallback. If eBay credentials exist but Amazon credentials do not,
+          the app runs live eBay data with Amazon demo fixtures until SP-API credentials are added. Use the toggle above only
+          when you want to force every connector into demo mode.
+        </p>
+      </div>
+
+      <label>
+        <span>Minimum confidence for clean opportunities</span>
+        <input type="number" min="0" max="100" name="opportunityMinConfidence" value="<%= settings.opportunityMinConfidence %>" />
+      </label>
+
+      <label>
+        <span>Maximum risk for clean opportunities</span>
+        <input type="number" min="0" max="100" name="opportunityMaxRisk" value="<%= settings.opportunityMaxRisk %>" />
+      </label>
+
+      <label class="toggle span-two">
+        <input type="checkbox" name="requireImageVerification" <%= settings.requireImageVerification ? 'checked' : '' %> />
+        <span>Require source and destination images before surfacing an item as a clean deal</span>
+      </label>
+
+      <label class="span-two">
+        <span>IP complaint alert brands</span>
+        <textarea name="ipComplaintBrands" rows="5" placeholder="Nike&#10;LEGO&#10;OtterBox"><%= settings.ipComplaintBrands.join('\n') %></textarea>
+        <small class="muted">Paste brands you avoid because of Amazon complaints, eBay VeRO profiles, or prior legal/IP issues. Matching items stay stored in the database and get routed to review with an alert.</small>
       </label>
 
       <div class="form-actions">

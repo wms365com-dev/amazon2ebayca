@@ -15,7 +15,7 @@ function buildImportInput(body: Record<string, unknown>) {
     maxShipping: parseCurrencyInput(body.maxShipping),
     minROI: parseCurrencyInput(body.minROI),
     minProfit: parseCurrencyInput(body.minProfit),
-    scanFrequencyMinutes: parseIntegerInput(body.scanFrequencyMinutes, 240),
+    scanFrequencyMinutes: parseIntegerInput(body.scanFrequencyMinutes, 1440),
     isActive: parseCheckbox(body.isActive),
     notes: sanitizeText(body.notes)
   });
@@ -28,7 +28,7 @@ function buildUpdateInput(body: Record<string, unknown>) {
     maxShipping: parseCurrencyInput(body.maxShipping),
     minROI: parseCurrencyInput(body.minROI),
     minProfit: parseCurrencyInput(body.minProfit),
-    scanFrequencyMinutes: parseIntegerInput(body.scanFrequencyMinutes, 240),
+    scanFrequencyMinutes: parseIntegerInput(body.scanFrequencyMinutes, 1440),
     conditionFilter: sanitizeText(body.conditionFilter),
     isActive: parseCheckbox(body.isActive),
     notes: sanitizeText(body.notes)
@@ -96,7 +96,7 @@ export async function listMonitoredProducts(req: Request, res: Response) {
       maxShipping: "",
       minROI: 15,
       minProfit: 8,
-      scanFrequencyMinutes: 240,
+      scanFrequencyMinutes: 1440,
       isActive: true,
       notes: ""
     }

@@ -15,6 +15,13 @@
     </div>
   </section>
 
+  <% if (isDemoMode) { %>
+    <section class="panel notice-panel">
+      <strong>Demo mode is active.</strong>
+      <p class="muted">Profit, pricing, and image evidence can come from fixtures while connectors are still being wired up. Treat this dashboard as a workflow preview, not a live buy queue.</p>
+    </section>
+  <% } %>
+
   <section class="metric-grid">
     <article class="metric-card">
       <span class="metric-label">Active profiles</span>
@@ -85,10 +92,19 @@
           <p class="empty">Run a scan to populate opportunities.</p>
         <% } %>
         <% topOpportunities.forEach((item) => { %>
+          <% const sourceIdentifier = getListingIdentifier(item.sourceListing); %>
+          <% const sourceIsDemo = isDemoFixtureRecord(item.sourceListing.rawJson); %>
           <a href="/opportunities/<%= item.id %>" class="opportunity-card">
-            <div>
+            <div class="opportunity-main">
+              <img src="<%= resolveListingDisplayImage(item.sourceListing) %>" alt="Opportunity source item" class="thumb" />
+              <div>
               <strong><%= item.sourceListing.title %></strong>
               <div class="muted"><%= item.savedSearch.name %></div>
+                <div class="tag-list compact-tags">
+                  <span class="tag <%= sourceIsDemo ? 'warning' : 'success' %>"><%= getListingDataSourceLabel(item.sourceListing.rawJson) %></span>
+                  <span class="tag"><%= sourceIdentifier.label %> <%= sourceIdentifier.value %></span>
+                </div>
+              </div>
             </div>
             <div class="opportunity-meta">
               <span class="profit <%= item.netProfit >= 0 ? 'positive' : 'negative' %>"><%= formatCurrency(item.netProfit) %></span>

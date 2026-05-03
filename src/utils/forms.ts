@@ -24,7 +24,7 @@ export function sanitizeText(value: unknown): string {
 
 export function parseCommaList(value: unknown): string[] {
   return sanitizeText(value)
-    .split(",")
+    .split(/[\n,]/)
     .map((part) => part.trim())
     .filter(Boolean);
 }

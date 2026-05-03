@@ -6,12 +6,24 @@
   <section class="page-intro">
     <div>
       <h1>Opportunities</h1>
-      <p>Review both `eBay -> Amazon` and `Amazon -> eBay` opportunities, using stored listing history and current destination estimates.</p>
+      <p>Review both `eBay -> Amazon` and `Amazon -> eBay` opportunities with source-vs-destination evidence, identifiers, and pricing context.</p>
     </div>
   </section>
 
+  <% if (isDemoMode) { %>
+    <section class="panel notice-panel">
+      <strong>Demo mode is active.</strong>
+      <p class="muted">Rows can contain fixture titles, placeholder images, and simulated fees or prices. Use this screen to test workflow only, not to approve real buys.</p>
+    </section>
+  <% } %>
+
   <section class="panel">
     <form method="get" action="/opportunities" class="filter-grid">
+      <label class="toggle">
+        <input type="hidden" name="qualityOnly" value="false" />
+        <input type="checkbox" name="qualityOnly" value="true" <%= qualityOnly ? 'checked' : '' %> />
+        <span>Quality-screened only</span>
+      </label>
       <label class="toggle">
         <input type="checkbox" name="profitableOnly" value="true" <%= filters.profitableOnly === 'true' ? 'checked' : '' %> />
         <span>Profitable only</span>
@@ -71,7 +83,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Image</th>
+            <th>Proof</th>
             <th>Direction</th>
             <th>Source listing</th>
             <th>Source cost</th>
@@ -92,21 +104,50 @@
             <tr><td colspan="14" class="empty">No opportunities matched your current filters.</td></tr>
           <% } %>
           <% opportunities.forEach((item) => { %>
+            <% const sourceIdentifier = getListingIdentifier(item.sourceListing); %>
+            <% const destinationIdentifier = item.destinationListing ? getListingIdentifier(item.destinationListing) : null; %>
+            <% const sourceIsDemo = isDemoFixtureRecord(item.sourceListing.rawJson); %>
+            <% const destinationIsDemo = item.destinationListing ? isDemoFixtureRecord(item.destinationListing.rawJson) : false; %>
             <tr>
               <td>
-                <% if (item.sourceListing.imageUrl) { %>
-                  <img src="<%= item.sourceListing.imageUrl %>" alt="Source item" class="thumb" />
-                <% } else { %>
-                  <div class="thumb placeholder"></div>
-                <% } %>
+                <div class="proof-grid">
+                  <div class="proof-card">
+                    <img src="<%= resolveListingDisplayImage(item.sourceListing) %>" alt="Source item" class="thumb" />
+                    <span class="proof-label">Source</span>
+                  </div>
+                  <div class="proof-card">
+                    <% if (item.destinationListing) { %>
+                      <img src="<%= resolveListingDisplayImage(item.destinationListing) %>" alt="Destination item" class="thumb" />
+                    <% } else { %>
+                      <div class="thumb placeholder"></div>
+                    <% } %>
+                    <span class="proof-label">Destination</span>
+                  </div>
+                </div>
               </td>
               <td><span class="badge"><%= item.savedSearch.sourceMarketplace %> -> <%= item.savedSearch.destinationMarketplace %></span></td>
               <td>
                 <a href="/opportunities/<%= item.id %>"><strong><%= item.sourceListing.title %></strong></a>
                 <div class="muted"><%= item.savedSearch.name %></div>
+                <div class="tag-list compact-tags">
+                  <span class="tag <%= sourceIsDemo ? 'warning' : 'success' %>"><%= getListingDataSourceLabel(item.sourceListing.rawJson) %></span>
+                  <span class="tag"><%= sourceIdentifier.label %> <%= sourceIdentifier.value %></span>
+                </div>
               </td>
               <td><%= formatCurrency(item.sourceItemCost + item.sourceShippingCost) %></td>
-              <td><%= item.destinationListing?.title ?? 'No confident destination match yet' %></td>
+              <td>
+                <% if (item.destinationListing) { %>
+                  <div><%= item.destinationListing.title %></div>
+                  <div class="tag-list compact-tags">
+                    <span class="tag <%= destinationIsDemo ? 'warning' : 'success' %>"><%= getListingDataSourceLabel(item.destinationListing.rawJson) %></span>
+                    <% if (destinationIdentifier) { %>
+                      <span class="tag"><%= destinationIdentifier.label %> <%= destinationIdentifier.value %></span>
+                    <% } %>
+                  </div>
+                <% } else { %>
+                  <span class="muted">No confident destination match yet</span>
+                <% } %>
+              </td>
               <td><%= formatCurrency(item.destinationSellPrice) %></td>
               <td><%= formatCurrency(item.destinationFeeEstimate) %></td>
               <td><%= formatCurrency(item.fulfillmentCostEstimate + item.prepCostEstimate + item.labelCostEstimate) %></td>

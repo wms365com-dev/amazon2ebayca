@@ -38,8 +38,13 @@ export const settingsSchema = z.object({
   applySalesTax: z.boolean(),
   salesTaxRate: z.number().min(0).max(1),
   schedulerEnabled: z.boolean(),
+  schedulerMinIntervalMinutes: z.number().int().min(5).max(1440),
   rateLimitSafeMode: z.boolean(),
-  demoModeOverride: z.boolean()
+  demoModeOverride: z.boolean(),
+  opportunityMinConfidence: z.number().int().min(0).max(100),
+  opportunityMaxRisk: z.number().int().min(0).max(100),
+  requireImageVerification: z.boolean(),
+  ipComplaintBrands: z.array(z.string().min(1).max(100)).default([])
 });
 
 export const opportunityStatusSchema = z.object({

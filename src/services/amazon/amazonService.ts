@@ -8,6 +8,7 @@ import { AmazonCatalogCandidate, NormalizedMarketplaceListing } from "../../type
 import { readCache, writeCache } from "../../utils/cache";
 import { requestWithRetry } from "../../utils/http";
 import { createApiLog } from "../apiLogService";
+import { getConnectorStatus } from "../demo/demoMode";
 import { loadDemoAmazonCatalog, loadDemoAmazonFees, loadDemoAmazonPricing } from "../demo/fixtureService";
 import { getAppSettings } from "../settingsService";
 
@@ -42,8 +43,8 @@ export class AmazonService {
     context: RequestContext = {}
   ): Promise<AmazonCatalogCandidate | null> {
     const settings = await getAppSettings();
-    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
-    if (explicitDemoMode) {
+    const connectorStatus = getConnectorStatus("amazon", settings);
+    if (connectorStatus.mode === "demo") {
       const catalog = await loadDemoAmazonCatalog();
       return catalog.find((candidate) => candidate.asin === asin) ?? null;
     }
@@ -143,8 +144,8 @@ export class AmazonService {
     context: RequestContext = {}
   ): Promise<AmazonCatalogCandidate[]> {
     const settings = await getAppSettings();
-    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
-    if (explicitDemoMode) {
+    const connectorStatus = getConnectorStatus("amazon", settings);
+    if (connectorStatus.mode === "demo") {
       return this.searchDemoCatalog((candidate) => candidate.identifiers?.includes(identifier) ?? false);
     }
     this.assertCredentials();
@@ -204,8 +205,8 @@ export class AmazonService {
     context: RequestContext = {}
   ): Promise<AmazonCatalogCandidate[]> {
     const settings = await getAppSettings();
-    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
-    if (explicitDemoMode) {
+    const connectorStatus = getConnectorStatus("amazon", settings);
+    if (connectorStatus.mode === "demo") {
       return this.searchDemoCatalog((candidate) =>
         candidate.title.toLowerCase().includes((keywords.toLowerCase().split(" ")[0] ?? "").trim())
       );
@@ -262,8 +263,8 @@ export class AmazonService {
 
   async getPricingForAsin(asin: string, marketplaceId: string, context: RequestContext = {}): Promise<PricingResult> {
     const settings = await getAppSettings();
-    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
-    if (explicitDemoMode) {
+    const connectorStatus = getConnectorStatus("amazon", settings);
+    if (connectorStatus.mode === "demo") {
       const pricingMap = await loadDemoAmazonPricing();
       return pricingMap[asin] ?? { amazonPrice: null, featuredOfferPrice: null };
     }
@@ -302,8 +303,8 @@ export class AmazonService {
     context: RequestContext = {}
   ): Promise<FeeResult> {
     const settings = await getAppSettings();
-    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
-    if (explicitDemoMode) {
+    const connectorStatus = getConnectorStatus("amazon", settings);
+    if (connectorStatus.mode === "demo") {
       const feeMap = await loadDemoAmazonFees();
       return feeMap[asin] ?? { feeEstimate: null, fulfillmentFee: null, referralFee: null };
     }
@@ -347,7 +348,9 @@ export class AmazonService {
 
   private assertCredentials() {
     if (!env.hasAmazonCredentials) {
-      throw new Error("Amazon credentials are missing. Configure SP-API credentials or enable demo mode explicitly.");
+      throw new Error(
+        "Amazon SP-API credentials are missing. Add them for live pricing, or keep DEMO_MODE=true for Amazon fallback."
+      );
     }
   }
 

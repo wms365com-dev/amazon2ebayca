@@ -283,24 +283,32 @@ Notes:
 
 ## Demo Mode
 
-Demo mode is now explicit.
+Demo behavior is now connector-aware.
 
-It is active when either of these are true:
+There are two ways it can activate:
 
 - `DEMO_MODE=true`
-- the settings page has `Force explicit demo mode` enabled
+- the settings page has `Force all connectors into demo mode` enabled
 
-When demo mode is active:
+How it works:
 
-- the header shows a `Demo Mode` badge
+- `Force all connectors into demo mode` is a hard override and forces both connectors onto fixtures
+- `DEMO_MODE=true` is softer and acts as fallback only for connectors that do not have credentials yet
+- if eBay credentials exist but Amazon SP-API credentials do not, the app runs `live eBay + demo Amazon`
+- if both connector credential sets exist, the app stays live even if `DEMO_MODE=true`
+
+When any connector is in demo:
+
+- the header shows connector-level status instead of pretending everything is live
 - seeded sample profiles are available
-- scans use fixtures from `data/fixtures`
+- demo-backed scans use fixtures from `data/fixtures`
+- demo opportunities render placeholder evidence cards instead of pretending stock photos are live marketplace proof
 - the UI still persists scans, snapshots, notes, and statuses to the database
 
 Important:
 
-- missing eBay or Amazon credentials no longer silently enable demo mode
-- if a connector is required for a scan profile and its credentials are missing, the scan fails with a clear error
+- missing eBay or Amazon credentials no longer silently switch every connector into demo
+- if a connector is required for a scan profile, has no credentials, and demo fallback is not enabled, the scan fails with a clear error
 
 ## How Scanning Works
 
@@ -481,6 +489,8 @@ AMAZON_SPAPI_AWS_REGION=us-east-1
 DEMO_MODE=false
 ```
 
+During staged setup, you can leave `DEMO_MODE=true` while only one connector is ready. For example, live eBay search can run immediately while Amazon pricing still uses demo fallback until SP-API credentials are added.
+
 ## eBay Credentials
 
 To enable live eBay Canada search:
@@ -590,4 +600,5 @@ npm run railway:scan-due
 - No multi-user auth
 - eBay sold-history data is not broadly available through this MVP
 - `Amazon -> eBay` pricing confidence is lower than `eBay -> Amazon` because it relies on active comps rather than official sold-history access
+- Demo mode is intentionally a workflow preview, not a trustworthy sourcing feed
 - SQLite is correct for the MVP, but Postgres is the next step for multi-service workers and heavier analytics

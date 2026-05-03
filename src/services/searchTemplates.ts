@@ -52,7 +52,7 @@ const suggestedSearchTemplates: SuggestedSearchTemplate[] = [
       maxShipping: 15,
       minROI: 18,
       minProfit: 9,
-      scanFrequencyMinutes: 180,
+      scanFrequencyMinutes: 1440,
       isActive: true
     }
   },
@@ -78,7 +78,7 @@ const suggestedSearchTemplates: SuggestedSearchTemplate[] = [
       maxShipping: 12,
       minROI: 15,
       minProfit: 8,
-      scanFrequencyMinutes: 240,
+      scanFrequencyMinutes: 1440,
       isActive: true
     }
   },
@@ -104,7 +104,7 @@ const suggestedSearchTemplates: SuggestedSearchTemplate[] = [
       maxShipping: 18,
       minROI: 20,
       minProfit: 12,
-      scanFrequencyMinutes: 360,
+      scanFrequencyMinutes: 1440,
       isActive: true
     }
   },
@@ -130,7 +130,7 @@ const suggestedSearchTemplates: SuggestedSearchTemplate[] = [
       maxShipping: null,
       minROI: 12,
       minProfit: 10,
-      scanFrequencyMinutes: 240,
+      scanFrequencyMinutes: 1440,
       isActive: true
     }
   },
@@ -156,7 +156,7 @@ const suggestedSearchTemplates: SuggestedSearchTemplate[] = [
       maxShipping: null,
       minROI: 14,
       minProfit: 9,
-      scanFrequencyMinutes: 360,
+      scanFrequencyMinutes: 1440,
       isActive: true
     }
   },
@@ -182,7 +182,7 @@ const suggestedSearchTemplates: SuggestedSearchTemplate[] = [
       maxShipping: null,
       minROI: 12,
       minProfit: 8,
-      scanFrequencyMinutes: 300,
+      scanFrequencyMinutes: 1440,
       isActive: true
     }
   }

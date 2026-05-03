@@ -16,12 +16,18 @@ export interface DueScanRunSummary {
 
 type SearchWithLatestJob = Awaited<ReturnType<typeof loadEligibleSearches>>[number];
 
-export function isSavedSearchDue(lastRunAt: Date | null | undefined, scanFrequencyMinutes: number, now = new Date()) {
+export function isSavedSearchDue(
+  lastRunAt: Date | null | undefined,
+  scanFrequencyMinutes: number,
+  minimumIntervalMinutes: number,
+  now = new Date()
+) {
   if (!lastRunAt) {
     return true;
   }
 
-  const nextEligibleTime = new Date(lastRunAt.getTime() + scanFrequencyMinutes * 60_000);
+  const effectiveFrequencyMinutes = Math.max(scanFrequencyMinutes, minimumIntervalMinutes);
+  const nextEligibleTime = new Date(lastRunAt.getTime() + effectiveFrequencyMinutes * 60_000);
   return nextEligibleTime <= now;
 }
 
@@ -40,9 +46,9 @@ async function loadEligibleSearches(now: Date) {
   });
 }
 
-function filterDueSearches(searches: SearchWithLatestJob[], now: Date) {
+function filterDueSearches(searches: SearchWithLatestJob[], minimumIntervalMinutes: number, now: Date) {
   return searches.filter((search) =>
-    isSavedSearchDue(search.scanJobs[0]?.startedAt, search.scanFrequencyMinutes, now)
+    isSavedSearchDue(search.scanJobs[0]?.startedAt, search.scanFrequencyMinutes, minimumIntervalMinutes, now)
   );
 }
 
@@ -58,7 +64,7 @@ export async function runDueSearchScans(triggeredBy = "scheduler"): Promise<DueS
   const settings = await getAppSettings();
   const now = new Date();
   const eligibleSearches = await loadEligibleSearches(now);
-  const dueSearches = filterDueSearches(eligibleSearches, now);
+  const dueSearches = filterDueSearches(eligibleSearches, settings.schedulerMinIntervalMinutes, now);
   const summary: DueScanRunSummary = {
     schedulerEnabled: settings.schedulerEnabled,
     searchesChecked: eligibleSearches.length,

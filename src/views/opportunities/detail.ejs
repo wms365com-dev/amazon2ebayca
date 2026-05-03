@@ -2,16 +2,29 @@
 <%- include("../partials/header") %>
 <%- include("../partials/flash") %>
 
+<% const sourceIdentifier = getListingIdentifier(opportunity.sourceListing); %>
+<% const destinationIdentifier = opportunity.destinationListing ? getListingIdentifier(opportunity.destinationListing) : null; %>
+<% const sourceIsDemo = isDemoFixtureRecord(opportunity.sourceListing.rawJson); %>
+<% const destinationIsDemo = opportunity.destinationListing ? isDemoFixtureRecord(opportunity.destinationListing.rawJson) : false; %>
+<% const usesAnyDemoData = sourceIsDemo || destinationIsDemo; %>
+
 <main class="shell page-shell">
   <section class="page-intro">
     <div>
       <h1>Opportunity Detail</h1>
-      <p>Review the source listing, destination estimate, historical snapshots, and workflow notes before making a sourcing decision.</p>
+      <p>Review the source listing, destination evidence, identifiers, and workflow notes before making a sourcing decision.</p>
     </div>
     <div class="intro-actions">
       <a href="/opportunities" class="button secondary">Back to list</a>
     </div>
   </section>
+
+  <% if (usesAnyDemoData) { %>
+    <section class="panel notice-panel">
+      <strong>This opportunity contains demo fixture data.</strong>
+      <p class="muted">At least one side of this comparison is simulated. The prices, images, and match evidence are useful for UI testing only and should not be used to buy inventory.</p>
+    </section>
+  <% } %>
 
   <section class="detail-grid">
     <article class="panel">
@@ -20,17 +33,19 @@
         <a href="<%= opportunity.sourceListing.listingUrl %>" target="_blank" rel="noreferrer" class="text-link">Open source listing</a>
       </div>
       <div class="detail-card">
-        <% if (opportunity.sourceListing.imageUrl) { %>
-          <img src="<%= opportunity.sourceListing.imageUrl %>" alt="Source item image" class="detail-image" />
-        <% } %>
+        <img src="<%= resolveListingDisplayImage(opportunity.sourceListing) %>" alt="Source item image" class="detail-image" />
         <div class="detail-copy">
           <strong><%= opportunity.sourceListing.title %></strong>
           <p class="muted">Marketplace: <%= opportunity.sourceListing.marketplace %></p>
           <p class="muted">Condition: <%= opportunity.sourceListing.condition ?? 'Unknown' %></p>
-          <p class="muted">Brand: <%= opportunity.sourceListing.brand ?? 'Unknown' %> | UPC: <%= opportunity.sourceListing.upc ?? opportunity.sourceListing.gtin ?? '--' %></p>
+          <p class="muted">Brand: <%= opportunity.sourceListing.brand ?? 'Unknown' %> | <%= sourceIdentifier.label %>: <%= sourceIdentifier.value %></p>
           <% if (opportunity.sourceListing.sellerName) { %>
             <p class="muted">Seller: <%= opportunity.sourceListing.sellerName %> | Feedback: <%= opportunity.sourceListing.sellerFeedbackPercentage ?? '--' %>%</p>
           <% } %>
+          <div class="tag-list compact-tags">
+            <span class="tag <%= sourceIsDemo ? 'warning' : 'success' %>"><%= getListingDataSourceLabel(opportunity.sourceListing.rawJson) %></span>
+            <span class="tag"><%= getListingVisualStatus(opportunity.sourceListing) %></span>
+          </div>
         </div>
       </div>
     </article>
@@ -44,16 +59,19 @@
       </div>
       <% if (opportunity.destinationListing) { %>
         <div class="detail-card">
-          <% if (opportunity.destinationListing.imageUrl) { %>
-            <img src="<%= opportunity.destinationListing.imageUrl %>" alt="Destination item image" class="detail-image" />
-          <% } %>
+          <img src="<%= resolveListingDisplayImage(opportunity.destinationListing) %>" alt="Destination item image" class="detail-image" />
           <div class="detail-copy">
             <strong><%= opportunity.destinationListing.title %></strong>
             <p class="muted">Marketplace: <%= opportunity.destinationListing.marketplace %></p>
+            <p class="muted"><%= destinationIdentifier?.label ?? 'ID' %>: <%= destinationIdentifier?.value ?? '--' %></p>
             <p class="muted">Confidence: <span class="badge confidence"><%= opportunity.confidenceScore %></span></p>
             <% if (opportunity.listingMatch) { %>
               <p class="muted">Method: <%= opportunity.listingMatch.matchMethod %></p>
             <% } %>
+            <div class="tag-list compact-tags">
+              <span class="tag <%= destinationIsDemo ? 'warning' : 'success' %>"><%= getListingDataSourceLabel(opportunity.destinationListing.rawJson) %></span>
+              <span class="tag"><%= getListingVisualStatus(opportunity.destinationListing) %></span>
+            </div>
           </div>
         </div>
         <div class="tag-list">
@@ -90,6 +108,18 @@
         <div><dt>ROI</dt><dd><%= opportunity.roiPercent.toFixed(1) %>%</dd></div>
         <div><dt>Margin</dt><dd><%= opportunity.marginPercent.toFixed(1) %>%</dd></div>
         <div><dt>Break-even</dt><dd><%= formatCurrency(opportunity.breakEvenSellPrice) %></dd></div>
+      </dl>
+    </article>
+
+    <article class="panel">
+      <h2>Evidence summary</h2>
+      <dl class="stats-list">
+        <div><dt>Source data</dt><dd><%= getListingDataSourceLabel(opportunity.sourceListing.rawJson) %></dd></div>
+        <div><dt>Destination data</dt><dd><%= opportunity.destinationListing ? getListingDataSourceLabel(opportunity.destinationListing.rawJson) : 'No destination saved' %></dd></div>
+        <div><dt>Source identifier</dt><dd><%= sourceIdentifier.label %> <%= sourceIdentifier.value %></dd></div>
+        <div><dt>Destination identifier</dt><dd><%= destinationIdentifier ? `${destinationIdentifier.label} ${destinationIdentifier.value}` : '--' %></dd></div>
+        <div><dt>Source image</dt><dd><%= getListingVisualStatus(opportunity.sourceListing) %></dd></div>
+        <div><dt>Destination image</dt><dd><%= opportunity.destinationListing ? getListingVisualStatus(opportunity.destinationListing) : 'No destination saved' %></dd></div>
       </dl>
     </article>
 

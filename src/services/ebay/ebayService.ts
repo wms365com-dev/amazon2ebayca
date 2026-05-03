@@ -6,6 +6,7 @@ import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 import { createApiLog } from "../apiLogService";
 import { loadDemoEbayListings } from "../demo/fixtureService";
+import { getConnectorStatus } from "../demo/demoMode";
 import { getAppSettings } from "../settingsService";
 import { readCache, writeCache } from "../../utils/cache";
 import { requestWithRetry } from "../../utils/http";
@@ -75,9 +76,9 @@ export class EbayService {
     const settings = await getAppSettings();
     const safeMode = settings.rateLimitSafeMode;
     const limit = Math.min(params.limit ?? (safeMode ? 10 : 25), safeMode ? 10 : 25);
-    const explicitDemoMode = settings.demoModeOverride || env.demoModeRequested;
+    const connectorStatus = getConnectorStatus("ebay", settings);
 
-    if (explicitDemoMode) {
+    if (connectorStatus.mode === "demo") {
       const demoListings = await loadDemoEbayListings();
       const filtered = this.filterListings(demoListings, params).slice(0, limit);
 
@@ -95,8 +96,10 @@ export class EbayService {
       return filtered;
     }
 
-    if (!env.hasEbayCredentials) {
-      throw new Error("eBay credentials are missing. Configure eBay credentials or enable demo mode explicitly.");
+    if (connectorStatus.mode === "missing") {
+      throw new Error(
+        "eBay credentials are missing. Add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET, or keep DEMO_MODE=true for eBay fallback."
+      );
     }
 
     const cacheKey = `ebay:${JSON.stringify(params)}`;

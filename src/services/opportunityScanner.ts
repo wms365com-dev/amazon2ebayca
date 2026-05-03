@@ -23,6 +23,7 @@ import {
   extractPackCount
 } from "./matching/helpers";
 import { calculateArbitrageProfit } from "./calculator/profitCalculator";
+import { evaluateOpportunityQuality } from "./opportunityQualityService";
 import { assessArbitrageRisk } from "./risk/riskEngine";
 import { createApiLog } from "./apiLogService";
 import { getAppSettings } from "./settingsService";
@@ -902,13 +903,29 @@ async function persistOpportunityForListing(
     matchWarnings: matchEvidence.warnings,
     netProfit: calculation.netProfit,
     marginPercent: calculation.marginPercent,
-    minProfitThreshold: savedSearch.minProfit
+    minProfitThreshold: savedSearch.minProfit,
+    ipComplaintBrands: settings.ipComplaintBrands
+  });
+  const quality = evaluateOpportunityQuality({
+    settings,
+    sourceListing,
+    destinationListing: matchEvidence.destination,
+    confidenceScore: matchEvidence.confidence,
+    riskScore: risk.score,
+    riskFlags: risk.flags,
+    netProfit: calculation.netProfit
   });
 
   const opportunityKey = `${savedSearch.id}:${sourceRecord.id}:${destinationRecord?.id ?? "unmatched"}`;
   const current = await prisma.arbitrageOpportunity.findUnique({
     where: { opportunityKey }
   });
+  const recommendedStatus = quality.passes ? OpportunityStatus.NEW : OpportunityStatus.REVIEW;
+  const nextStatus =
+    current && current.status !== OpportunityStatus.NEW && current.status !== OpportunityStatus.REVIEW
+      ? current.status
+      : recommendedStatus;
+  const qualityNote = quality.reasons.length > 0 ? quality.reasons.join("; ") : "Passed quality screening";
 
   const data = {
     savedSearchId: savedSearch.id,
@@ -933,7 +950,8 @@ async function persistOpportunityForListing(
     confidenceScore: matchEvidence.confidence,
     riskScore: risk.score,
     riskFlags: risk.flags as unknown as Prisma.InputJsonValue,
-    lastScannedAt: new Date()
+    lastScannedAt: new Date(),
+    status: nextStatus
   };
 
   const opportunity = current
@@ -944,8 +962,7 @@ async function persistOpportunityForListing(
     : await prisma.arbitrageOpportunity.create({
         data: {
           opportunityKey,
-          ...data,
-          status: matchEvidence.destination ? OpportunityStatus.NEW : OpportunityStatus.REVIEW
+          ...data
         }
       });
 
@@ -973,7 +990,16 @@ async function persistOpportunityForListing(
         opportunityId: opportunity.id,
         fromStatus: null,
         toStatus: opportunity.status,
-        note: "Created during scan"
+        note: quality.passes ? "Created during scan" : `Created in review: ${qualityNote}`
+      }
+    });
+  } else if (current.status !== opportunity.status) {
+    await prisma.arbitrageOpportunityStatusHistory.create({
+      data: {
+        opportunityId: opportunity.id,
+        fromStatus: current.status,
+        toStatus: opportunity.status,
+        note: `Status adjusted during scan: ${qualityNote}`
       }
     });
   }
@@ -982,12 +1008,18 @@ async function persistOpportunityForListing(
     source: ApiLogSource.APP,
     operation: "persistOpportunity",
     requestKey: sourceListing.externalListingId,
-    message: matchEvidence.destination ? "Opportunity matched and updated" : "Opportunity stored without destination match",
+    message: quality.passes
+      ? matchEvidence.destination
+        ? "Opportunity matched, quality-screened, and updated"
+        : "Opportunity stored without destination match"
+      : "Opportunity routed to review after quality screening",
     detail: {
       opportunityId: opportunity.id,
       destinationListingId: destinationRecord?.id ?? null,
       confidence: matchEvidence.confidence,
-      riskScore: risk.score
+      riskScore: risk.score,
+      qualityPassed: quality.passes,
+      qualityReasons: quality.reasons
     },
     scanJobId,
     savedSearchId: savedSearch.id
@@ -996,7 +1028,7 @@ async function persistOpportunityForListing(
   return {
     isNew: !current,
     matched: Boolean(matchEvidence.destination),
-    warningCount: matchEvidence.warnings.length + risk.flags.length,
+    warningCount: matchEvidence.warnings.length + risk.flags.length + quality.reasons.length,
     opportunityId: opportunity.id
   };
 }

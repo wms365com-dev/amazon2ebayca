@@ -6,9 +6,16 @@ import router from "./routes";
 import webhookRouter from "./routes/webhooks";
 import { httpLogger } from "./config/logger";
 import { getAppSettings } from "./services/settingsService";
-import { isDemoModeActive } from "./services/demo/demoMode";
+import { getConnectorModes, isDemoModeActive } from "./services/demo/demoMode";
 import { csrfTokenMiddleware, verifyCsrfMiddleware } from "./utils/csrf";
 import { formatCurrency, formatDateTime, formatPercent } from "./utils/format";
+import {
+  getListingDataSourceLabel,
+  getListingIdentifier,
+  getListingVisualStatus,
+  isDemoFixtureRecord,
+  resolveListingDisplayImage
+} from "./utils/listingEvidence";
 
 export function createApp() {
   const app = express();
@@ -28,6 +35,7 @@ export function createApp() {
   app.use((req, res, next) => {
     void (async () => {
       const settings = await getAppSettings();
+      const connectorModes = getConnectorModes(settings);
       res.locals.appName = "Amazon.ca <-> eBay.ca Arbitrage Analyzer";
       res.locals.currentPath = req.path;
       res.locals.notice = req.query.notice;
@@ -37,6 +45,12 @@ export function createApp() {
       res.locals.formatPercent = formatPercent;
       res.locals.formatDateTime = formatDateTime;
       res.locals.isDemoMode = isDemoModeActive(settings);
+      res.locals.connectorModes = connectorModes;
+      res.locals.isDemoFixtureRecord = isDemoFixtureRecord;
+      res.locals.getListingDataSourceLabel = getListingDataSourceLabel;
+      res.locals.getListingIdentifier = getListingIdentifier;
+      res.locals.getListingVisualStatus = getListingVisualStatus;
+      res.locals.resolveListingDisplayImage = resolveListingDisplayImage;
       next();
     })().catch(next);
   });

@@ -27,9 +27,15 @@ interface ArbitrageRiskInput {
   netProfit: number;
   marginPercent: number;
   minProfitThreshold?: number | null;
+  ipComplaintBrands?: string[];
 }
 
 const restrictedBrands = new Set(["nike", "adidas", "lego", "nintendo", "apple"]);
+
+function brandMatchesAlertList(brand: string, sourceTitle: string, destinationTitle: string, alertBrands: string[]) {
+  const haystack = `${brand} ${sourceTitle} ${destinationTitle}`.toLowerCase();
+  return alertBrands.some((item) => haystack.includes(item));
+}
 
 function pushFlag(flags: RiskFlag[], code: RiskFlag["code"], severity: RiskFlag["severity"], message: string) {
   flags.push({ code, severity, message });
@@ -40,6 +46,9 @@ export function assessArbitrageRisk(input: ArbitrageRiskInput): RiskAssessment {
   let score = 5;
   const condition = String(input.sourceListing.condition ?? "").toLowerCase();
   const brand = String(input.sourceListing.brand ?? input.destinationListing?.brand ?? "").toLowerCase();
+  const sourceTitle = input.sourceListing.title.toLowerCase();
+  const destinationTitle = String(input.destinationListing?.title ?? "").toLowerCase();
+  const ipComplaintBrands = (input.ipComplaintBrands ?? []).map((item) => item.toLowerCase()).filter(Boolean);
 
   if (!input.sourceListing.upc && !input.sourceListing.gtin) {
     pushFlag(flags, "NO_BARCODE", "medium", "Listing has no UPC or GTIN for deterministic matching.");
@@ -103,14 +112,33 @@ export function assessArbitrageRisk(input: ArbitrageRiskInput): RiskAssessment {
     score += 8;
   }
 
+  if (ipComplaintBrands.length > 0 && brandMatchesAlertList(brand, sourceTitle, destinationTitle, ipComplaintBrands)) {
+    pushFlag(
+      flags,
+      "IP_COMPLAINT_BRAND",
+      "high",
+      "Brand appears on your IP complaint alert list and should be reviewed before buying."
+    );
+    score += 28;
+  }
+
   if (restrictedBrands.has(brand) && input.destinationMarketplace === Marketplace.AMAZON_CA) {
     pushFlag(flags, "POSSIBLE_RESTRICTION", "medium", "Brand may require ungating or extra compliance checks.");
     score += 8;
   }
 
   if (!input.sourceListing.imageUrl || !input.destinationListing?.imageUrl) {
-    pushFlag(flags, "IMAGE_UNVERIFIED", "low", "Image similarity has not been verified automatically.");
-    score += 5;
+    const missingSides = [
+      !input.sourceListing.imageUrl ? "source" : null,
+      !input.destinationListing?.imageUrl ? "destination" : null
+    ].filter(Boolean);
+    pushFlag(
+      flags,
+      "IMAGE_UNVERIFIED",
+      "high",
+      `Missing ${missingSides.join(" and ")} image data makes this deal harder to trust automatically.`
+    );
+    score += 14;
   }
 
   if (
@@ -201,6 +229,7 @@ export function assessRisk(input: LegacyRiskInput): RiskAssessment {
     matchWarnings: input.matchWarnings,
     netProfit: input.netProfit,
     marginPercent: input.marginPercent,
-    minProfitThreshold: input.minProfitThreshold
+    minProfitThreshold: input.minProfitThreshold,
+    ipComplaintBrands: []
   });
 }

@@ -1,21 +1,66 @@
 <header class="site-header">
-  <div class="shell header-shell">
-    <div class="brand-block">
+  <div class="header-shell">
+    <div class="brand-stack">
+      <div class="system-kicker">Marketplace Ops Console</div>
       <a href="/dashboard" class="brand-mark"><%= appName %></a>
       <div class="brand-subline">
-        eBay.ca and Amazon.ca arbitrage
-        <% if (isDemoMode) { %>
-          <span class="badge badge-demo">Demo Mode</span>
-        <% } %>
+        eBay.ca and Amazon.ca sourcing, replens, and opportunity tracking.
       </div>
     </div>
+
+    <div class="status-cluster">
+      <article class="status-card">
+        <span class="status-label">System mode</span>
+        <strong><%= connectorModes.headline %></strong>
+        <div class="connector-status-row">
+          <span class="badge <%= connectorModes.ebay.badgeClass %>">eBay: <%= connectorModes.ebay.label %></span>
+          <span class="badge <%= connectorModes.amazon.badgeClass %>">Amazon: <%= connectorModes.amazon.label %></span>
+        </div>
+        <small class="status-copy"><%= connectorModes.detail %></small>
+      </article>
+      <article class="status-card">
+        <span class="status-label">Storage</span>
+        <strong>Historical scans retained in database</strong>
+      </article>
+    </div>
+
     <nav class="site-nav">
-      <a href="/dashboard" class="<%= currentPath.startsWith('/dashboard') || currentPath === '/' ? 'active' : '' %>">Dashboard</a>
-      <a href="/searches" class="<%= currentPath.startsWith('/searches') ? 'active' : '' %>">Scan Profiles</a>
-      <a href="/replens" class="<%= currentPath.startsWith('/replens') ? 'active' : '' %>">Replens</a>
-      <a href="/opportunities" class="<%= currentPath.startsWith('/opportunities') ? 'active' : '' %>">Opportunities</a>
-      <a href="/settings" class="<%= currentPath.startsWith('/settings') ? 'active' : '' %>">Settings</a>
-      <a href="/admin" class="<%= currentPath.startsWith('/admin') ? 'active' : '' %>">Admin / Logs</a>
+      <a href="/dashboard" class="<%= currentPath.startsWith('/dashboard') || currentPath === '/' ? 'active' : '' %>">
+        <span>Dashboard</span>
+        <small>Control room</small>
+      </a>
+      <a href="/searches" class="<%= currentPath.startsWith('/searches') ? 'active' : '' %>">
+        <span>Scan Profiles</span>
+        <small>Discovery rules</small>
+      </a>
+      <a href="/replens" class="<%= currentPath.startsWith('/replens') ? 'active' : '' %>">
+        <span>Replens</span>
+        <small>ASIN monitoring</small>
+      </a>
+      <a href="/opportunities" class="<%= currentPath.startsWith('/opportunities') ? 'active' : '' %>">
+        <span>Opportunities</span>
+        <small>Review queue</small>
+      </a>
+      <a href="/settings" class="<%= currentPath.startsWith('/settings') ? 'active' : '' %>">
+        <span>Settings</span>
+        <small>Thresholds</small>
+      </a>
+      <a href="/admin" class="<%= currentPath.startsWith('/admin') ? 'active' : '' %>">
+        <span>Admin / Logs</span>
+        <small>System events</small>
+      </a>
     </nav>
+
+    <div class="sidebar-note">
+      <span class="status-label">Operator note</span>
+      <strong>Every listing is kept in the database so bad calls can be reviewed, rescored, and learned from later.</strong>
+      <% if (connectorModes.mixedMode) { %>
+        <div class="badge badge-demo">Mixed connector mode</div>
+      <% } else if (isDemoMode) { %>
+        <div class="badge badge-demo">Demo connector active</div>
+      <% } else if (connectorModes.hasMissingCredentials) { %>
+        <div class="badge inactive-badge">Credentials needed</div>
+      <% } %>
+    </div>
   </div>
 </header>
